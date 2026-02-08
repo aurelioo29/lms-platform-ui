@@ -1,4 +1,13 @@
+import { Suspense } from "react";
 import { ResetPasswordForm } from "@/components/reset-password-form";
+
+function ResetPasswordFormFallback() {
+  return (
+    <div className="text-center text-sm text-muted-foreground">
+      Loading reset form...
+    </div>
+  );
+}
 
 export default function ResetPasswordPage() {
   return (
@@ -23,10 +32,11 @@ export default function ResetPasswordPage() {
       {/* Content */}
       <div className="relative flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
         <div className="w-full max-w-sm">
-          {/* Premium card wrapper */}
           <div className="rounded-2xl border bg-background/80 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="p-6">
-              <ResetPasswordForm />
+              <Suspense fallback={<ResetPasswordFormFallback />}>
+                <ResetPasswordForm />
+              </Suspense>
             </div>
           </div>
 
