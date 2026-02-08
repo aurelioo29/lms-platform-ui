@@ -1,0 +1,52 @@
+name: Deploy Next.js UI to VPS
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+
+            APP_DIR="${{ secrets.APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then APP_DIR="/var/www/lms-ui"; fi
+
+            APP_PORT="${{ secrets.APP_PORT }}"
+            if [ -z "$APP_PORT" ]; then APP_PORT="3001"; fi
+
+            echo "== Go to app dir =="
+            cd "$APP_DIR"
+
+            echo "== Ensure correct ownership (optional safety) =="
+            # kalau kamu yakin sudah benar, baris ini boleh dihapus
+            sudo chown -R deploy:deploy "$APP_DIR"
+
+            echo "== Pull latest code =="
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "== Install deps =="
+            npm ci
+
+            echo "== Build =="
+            npm run build
+
+            echo "== Restart PM2 =="
+            pm2 describe lms-ui >/dev/null 2>&1 && pm2 restart lms-ui || pm2 start "npm run start -- -p $APP_PORT" --name lms-ui
+            pm2 save
+
+            echo "== Health check local =="
+            curl -I "http://127.0.0.1:$APP_PORT" | head -n 1
+
+            echo "== DONE =="
