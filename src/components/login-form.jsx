@@ -188,7 +188,7 @@ export function LoginForm({ className, ...props }) {
             </Button>
           </Field>
 
-          <FieldSeparator>Or</FieldSeparator>
+          {/* <FieldSeparator>Or</FieldSeparator>
 
           <Field className="grid gap-4 sm:grid-cols-1">
             <Button
@@ -199,7 +199,7 @@ export function LoginForm({ className, ...props }) {
             >
               Continue with Google
             </Button>
-          </Field>
+          </Field> */}
         </FieldGroup>
       </form>
     </div>
