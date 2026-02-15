@@ -6,6 +6,20 @@ function getCookie(name) {
   return match ? match[2] : null;
 }
 
+// Optional helpers (recommended)
+export function setAuthCookie(token, days = 7) {
+  if (typeof document === "undefined") return;
+  const maxAge = days * 24 * 60 * 60;
+  document.cookie = `auth=${encodeURIComponent(
+    token,
+  )}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+}
+
+export function clearAuthCookie() {
+  if (typeof document === "undefined") return;
+  document.cookie = "auth=; Path=/; Max-Age=0; SameSite=Lax";
+}
+
 export async function getCsrfCookie() {
   const res = await fetch(`${API_URL}/sanctum/csrf-cookie`, {
     credentials: "include",
@@ -16,8 +30,13 @@ export async function getCsrfCookie() {
 export async function apiFetch(path, options = {}) {
   const method = (options.method || "GET").toUpperCase();
 
+  // XSRF token (for Sanctum cookie-based requests)
   const xsrf = getCookie("XSRF-TOKEN");
   const xsrfDecoded = xsrf ? decodeURIComponent(xsrf) : null;
+
+  // Bearer token (for token-based requests e.g. Google OAuth)
+  const auth = getCookie("auth");
+  const authDecoded = auth ? decodeURIComponent(auth) : null;
 
   const headers = {
     Accept: "application/json",
@@ -25,6 +44,12 @@ export async function apiFetch(path, options = {}) {
     ...(options.headers || {}),
   };
 
+  // Attach Bearer token if available (Google OAuth flow)
+  if (authDecoded && !headers.Authorization) {
+    headers.Authorization = `Bearer ${authDecoded}`;
+  }
+
+  // Attach XSRF header for non-GET requests if cookie exists
   if (method !== "GET" && method !== "HEAD" && xsrfDecoded) {
     headers["X-XSRF-TOKEN"] = xsrfDecoded;
   }
@@ -32,10 +57,10 @@ export async function apiFetch(path, options = {}) {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers,
-    credentials: "include",
+    credentials: "include", // keep cookies for Sanctum
   });
 
-  // parse response aman (json / text kosong)
+  // Safe response parsing (json or empty text)
   let payload = null;
   const text = await res.text();
   try {

@@ -32,6 +32,7 @@ export function LoginForm({ className, ...props }) {
   const router = useRouter();
   const loginMutation = useLogin();
   const resendMutation = useResendVerification();
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   const [showPassword, setShowPassword] = useState(false);
 
@@ -188,18 +189,37 @@ export function LoginForm({ className, ...props }) {
             </Button>
           </Field>
 
-          {/* <FieldSeparator>Or</FieldSeparator>
+          <FieldSeparator>Or</FieldSeparator>
 
           <Field className="grid gap-4 sm:grid-cols-1">
             <Button
               variant="outline"
               type="button"
               disabled={isLoading}
-              className="hover:cursor-pointer"
+              className="w-full hover:cursor-pointer flex items-center justify-center gap-2"
+              onClick={() => {
+                window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google/redirect`;
+              }}
             >
+              <span className="inline-flex items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 424 432"
+                  aria-hidden="true"
+                  focusable="false"
+                  className="shrink-0"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M214 186v-1h201q3 12 3 36q0 93-56.5 150.5T213 429q-88 0-150.5-62T0 216T62 65T213 3q87 0 144 57l-57 56q-33-33-86-33q-54 0-92.5 39.5t-38.5 95t38.5 94.5t92.5 39q31 0 55-9.5t37.5-24.5t20.5-29.5t10-27.5H214v-74z"
+                  />
+                </svg>
+              </span>
               Continue with Google
             </Button>
-          </Field> */}
+          </Field>
         </FieldGroup>
       </form>
     </div>

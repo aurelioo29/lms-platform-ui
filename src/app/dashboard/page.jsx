@@ -1,30 +1,22 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLogout, useMe } from "@/features/auth/use-auth";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { data, isLoading, isError } = useMe();
+  const { data, isLoading } = useMe();
   const logoutMutation = useLogout();
 
   const user = data?.user;
 
-  if (isLoading) return <p style={{ padding: 24 }}>Loading...</p>;
+  useEffect(() => {
+    if (!isLoading && !user) router.push("/login");
+  }, [isLoading, user, router]);
 
-  if (isError || !user) {
-    return (
-      <div style={{ padding: 24 }}>
-        <p>Session invalid. Please login again.</p>
-        <button
-          onClick={() => router.push("/login")}
-          style={{ marginTop: 12, padding: 10 }}
-        >
-          Go to Login
-        </button>
-      </div>
-    );
-  }
+  if (isLoading) return <p style={{ padding: 24 }}>Loading...</p>;
+  if (!user) return null;
 
   return (
     <div style={{ padding: 24 }}>
