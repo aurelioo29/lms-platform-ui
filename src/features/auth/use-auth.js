@@ -11,6 +11,7 @@ import {
   forgotPasswordRequest,
   resetPasswordRequest,
 } from "./auth.queries";
+import { clearAuthCookie } from "@/lib/api";
 
 export function useMe() {
   return useQuery({
@@ -41,6 +42,7 @@ export function useLogout() {
   return useMutation({
     mutationFn: logoutRequest,
     onSuccess: () => {
+      clearAuthCookie();
       qc.setQueryData(authKeys.me, null);
       qc.invalidateQueries({ queryKey: authKeys.me });
     },
