@@ -6,6 +6,8 @@ import { BadgeCheck, LogOut, Sparkles, ChevronsUpDown } from "lucide-react";
 
 import { useLogout } from "@/features/auth/use-auth";
 
+import { alertConfirm, alertError } from "@/lib/ui/alerts";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -44,15 +46,30 @@ export function NavUser({ user }) {
   };
 
   const onLogout = async () => {
+    setOpen(false);
+
+    const result = await alertConfirm({
+      title: "Keluar?",
+      message: "Kamu akan keluar dari sesi ini.",
+      confirmText: "Ya, keluar",
+      cancelText: "Batal",
+      icon: "warning",
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
-      setOpen(false);
-      await logoutMutation.mutateAsync(); // hit API logout
+      await logoutMutation.mutateAsync();
     } catch (err) {
       console.error("Logout failed:", err);
+      await alertError({
+        title: "Gagal keluar",
+        message: "Server error. Sesi lokal tetap akan dibersihkan.",
+      });
     } finally {
-      clearAuthCookies(); // bersihin token/cookies client
-      router.replace("/login"); // replace biar ga bisa back
-      router.refresh(); // refresh state
+      clearAuthCookies();
+      router.replace("/login");
+      router.refresh();
     }
   };
 
@@ -144,7 +161,7 @@ export function NavUser({ user }) {
 
             <DropdownMenuItem
               disabled={logoutMutation.isPending}
-              onSelect={(e) => {
+              onClick={(e) => {
                 e.preventDefault();
                 onLogout();
               }}

@@ -1,4 +1,3 @@
-// src/lib/ui/alerts.js
 import Swal from "sweetalert2";
 
 function escapeHtml(str = "") {
@@ -21,31 +20,30 @@ function toBulletHtml(items) {
   `;
 }
 
-/**
- * Base config yang cocok untuk shadcn tokens.
- * NOTE: jangan set target kecuali kamu butuh banget.
- */
 export const swalBase = {
   width: 460,
   heightAuto: false,
-  backdrop: "rgba(0,0,0,.45)",
+  backdrop: "rgba(0,0,0,.55)",
   background: "var(--background)",
   color: "var(--foreground)",
   buttonsStyling: false,
+  focusConfirm: false,
+  returnFocus: false,
+  showClass: { popup: "swal2-show-fix" },
+  hideClass: { popup: "swal2-hide-fix" },
   customClass: {
     container: "swal2-container-fix",
-    popup: "rounded-2xl border border-border shadow-2xl",
-    title: "text-lg font-semibold",
-    htmlContainer: "text-sm text-muted-foreground",
-    confirmButton:
-      "bg-primary text-primary-foreground px-4 py-2 rounded-md cursor-pointer",
-    cancelButton:
-      "bg-muted text-foreground px-4 py-2 rounded-md cursor-pointer",
+    popup: "swal2-popup-fix",
+    title: "swal2-title-fix",
+    htmlContainer: "swal2-html-fix",
+    actions: "swal2-actions-fix",
+    confirmButton: "swal2-confirm-fix",
+    cancelButton: "swal2-cancel-fix",
   },
 };
 
 export function alertError({
-  title = "Periksa input kamu",
+  title = "Ada yang perlu dicek",
   message,
   messages,
   confirmText = "Oke",
@@ -56,10 +54,9 @@ export function alertError({
   return Swal.fire({
     ...swalBase,
     icon: "error",
+    iconColor: "var(--foreground)",
     title,
-    // ✅ kalau cuma 1, tampilkan plain text (tanpa bullet)
     text: single || message || undefined,
-    // ✅ kalau lebih dari 1, baru pakai html list
     html: !single && list.length > 0 ? toBulletHtml(list) : undefined,
     confirmButtonText: confirmText,
   });
@@ -68,11 +65,12 @@ export function alertError({
 export function alertSuccess({
   title = "Berhasil",
   message,
-  confirmText = "OK",
+  confirmText = "Sip",
 } = {}) {
   return Swal.fire({
     ...swalBase,
     icon: "success",
+    iconColor: "var(--foreground)",
     title,
     text: message,
     confirmButtonText: confirmText,
@@ -82,11 +80,12 @@ export function alertSuccess({
 export function alertInfo({
   title = "Info",
   message,
-  confirmText = "OK",
+  confirmText = "Oke",
 } = {}) {
   return Swal.fire({
     ...swalBase,
     icon: "info",
+    iconColor: "var(--foreground)",
     title,
     text: message,
     confirmButtonText: confirmText,
@@ -95,15 +94,16 @@ export function alertInfo({
 
 export function alertConfirm({
   title = "Konfirmasi",
-  message,
-  confirmText = "Ya",
+  message = "Lanjutkan aksi ini?",
+  confirmText = "Ya, lanjut",
   cancelText = "Batal",
-  icon = "question",
+  icon = "warning",
   reverseButtons = true,
 } = {}) {
   return Swal.fire({
     ...swalBase,
     icon,
+    iconColor: "var(--foreground)",
     title,
     text: message,
     showCancelButton: true,
@@ -113,9 +113,6 @@ export function alertConfirm({
   });
 }
 
-/**
- * Ambil error list dari API (Laravel 422 biasanya).
- */
 export function extractLaravelErrors(e) {
   const list = [];
   if (e?.status === 422 && e?.payload?.errors) {
@@ -127,30 +124,20 @@ export function extractLaravelErrors(e) {
   return list;
 }
 
-/**
- * Map error tertentu jadi bahasa manusia.
- * Kamu bisa tambah case lain kapan aja.
- */
 export function humanizeServerMessage(field, raw) {
   const msg = String(raw || "");
 
   if (field === "password") {
-    // biar gak muncul "harus mengandung huruf kecil..."
     return "Password terlalu lemah. Gunakan kombinasi huruf & angka.";
   }
 
   return msg;
 }
 
-/**
- * Handler error API yang bisa dipakai di semua form.
- * - setFieldError optional (react-hook-form setError)
- * - onEmailNotVerified optional (buat login)
- */
 export async function handleApiError(e, options = {}) {
   const {
     setFieldError, // (field, message) => void
-    fallbackMessage = "Terjadi error. Coba lagi.",
+    fallbackMessage = "Terjadi kesalahan. Coba lagi.",
     hideServerDetails = true,
   } = options;
 
@@ -167,16 +154,16 @@ export async function handleApiError(e, options = {}) {
     });
 
     await alertError({
-      title: "Periksa input kamu",
+      title: "Input belum valid",
       messages: friendly.length ? friendly : ["Data belum valid. Coba lagi."],
     });
-    return true; // handled
+    return true;
   }
 
   // 401 auth
   if (e?.status === 401) {
     await alertError({
-      title: "Gagal",
+      title: "Gagal masuk",
       message: "Email atau password salah.",
     });
     return true;
@@ -184,7 +171,7 @@ export async function handleApiError(e, options = {}) {
 
   // fallback
   await alertError({
-    title: "Oops!",
+    title: "Oops",
     message: e?.message || fallbackMessage,
   });
   return true;

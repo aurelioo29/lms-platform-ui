@@ -198,7 +198,7 @@ export function LoginForm({ className, ...props }) {
               disabled={isLoading}
               className="w-full hover:cursor-pointer flex items-center justify-center gap-2"
               onClick={() => {
-                window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google/redirect`;
+                window.location.href = `${API_URL}/auth/google/redirect`;
               }}
             >
               <span className="inline-flex items-center justify-center">
