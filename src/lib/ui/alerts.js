@@ -65,7 +65,7 @@ export function alertError({
 export function alertSuccess({
   title = "Berhasil",
   message,
-  confirmText = "Sip",
+  confirmText = "Oke",
 } = {}) {
   return Swal.fire({
     ...swalBase,

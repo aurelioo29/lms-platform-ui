@@ -10,6 +10,11 @@ import {
   resendVerificationRequest,
   forgotPasswordRequest,
   resetPasswordRequest,
+  updateAvatarRequest,
+  removeAvatarRequest,
+  updateUsernameRequest,
+  updateEmailRequest,
+  updatePasswordRequest,
 } from "./auth.queries";
 import { clearAuthCookie } from "@/lib/api";
 
@@ -61,4 +66,54 @@ export function useForgotPassword() {
 
 export function useResetPassword() {
   return useMutation({ mutationFn: resetPasswordRequest });
+}
+
+export function useUpdateAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file) => updateAvatarRequest(file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: authKeys.me });
+    },
+  });
+}
+
+export function useRemoveAvatar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: removeAvatarRequest,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: authKeys.me });
+    },
+  });
+}
+
+export function useUpdateUsername() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name) => updateUsernameRequest(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: authKeys.me });
+    },
+  });
+}
+
+export function useUpdateEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (email) => updateEmailRequest(email),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: authKeys.me });
+    },
+  });
+}
+
+export function useUpdatePassword() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload) => updatePasswordRequest(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: authKeys.me });
+    },
+  });
 }

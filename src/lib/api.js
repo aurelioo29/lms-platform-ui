@@ -80,3 +80,56 @@ export async function apiFetch(path, options = {}) {
 
   return payload;
 }
+
+export async function apiUpload(path, formData, options = {}) {
+  const method = (options.method || "POST").toUpperCase();
+
+  const xsrf = getCookie("XSRF-TOKEN");
+  const xsrfDecoded = xsrf ? decodeURIComponent(xsrf) : null;
+
+  const auth = getCookie("auth");
+  const authDecoded = auth ? decodeURIComponent(auth) : null;
+
+  const headers = {
+    Accept: "application/json",
+    ...(options.headers || {}),
+  };
+
+  // Bearer token if exists
+  if (authDecoded && !headers.Authorization) {
+    headers.Authorization = `Bearer ${authDecoded}`;
+  }
+
+  // XSRF header for non-GET
+  if (method !== "GET" && method !== "HEAD" && xsrfDecoded) {
+    headers["X-XSRF-TOKEN"] = xsrfDecoded;
+  }
+
+  // IMPORTANT: jangan set Content-Type, biar browser set boundary multipart
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers,
+    body: formData,
+    credentials: "include",
+    ...options,
+  });
+
+  let payload = null;
+  const text = await res.text();
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = text || null;
+  }
+
+  if (!res.ok) {
+    const error = new Error(
+      payload?.message || `Request failed (${res.status})`,
+    );
+    error.status = res.status;
+    error.payload = payload;
+    throw error;
+  }
+
+  return payload;
+}
