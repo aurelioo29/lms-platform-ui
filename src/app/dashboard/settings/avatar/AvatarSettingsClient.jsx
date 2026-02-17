@@ -15,13 +15,20 @@ import {
   useUpdateAvatar,
   useRemoveAvatar,
 } from "@/features/auth/use-auth";
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import { getAvatarSrc } from "@/lib/avatar";
-import { alertConfirm, alertSuccess, handleApiError } from "@/lib/ui/alerts";
+import {
+  alertConfirm,
+  alertSuccess,
+  alertError,
+  handleApiError,
+} from "@/lib/ui/alerts";
 
 function SectionHeader({ title, description, right }) {
   return (
@@ -74,13 +81,16 @@ export default function AvatarSettingsClient() {
   const removeAvatar = useRemoveAvatar();
 
   const fileRef = useRef(null);
+
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [removing, setRemoving] = useState(false); // ✅ FIX: missing state
 
   const currentAvatar = useMemo(
     () => getAvatarSrc(user?.avatar),
     [user?.avatar],
   );
+
   const displayName = useMemo(() => user?.name ?? "U", [user?.name]);
   const email = useMemo(() => user?.email ?? "-", [user?.email]);
 
@@ -96,23 +106,26 @@ export default function AvatarSettingsClient() {
 
     const okTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!okTypes.includes(f.type)) {
-      handleApiError(
-        { message: "Invalid file type" },
-        { fallbackMessage: "Upload JPG, PNG, atau WebP." },
-      );
+      alertError({
+        title: "File tidak didukung",
+        message: "Upload JPG, PNG, atau WebP.",
+      });
       e.target.value = "";
       return;
     }
 
     // max 10MB (ikut backend)
     if (f.size > 10 * 1024 * 1024) {
-      handleApiError(
-        { message: "File too large" },
-        { fallbackMessage: "Maksimal 10MB ya." },
-      );
+      alertError({
+        title: "File kebesaran",
+        message: "Maksimal 10MB ya.",
+      });
       e.target.value = "";
       return;
     }
+
+    // revoke old preview
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
 
     setFile(f);
     const url = URL.createObjectURL(f);
@@ -131,10 +144,12 @@ export default function AvatarSettingsClient() {
 
     try {
       await updateAvatar.mutateAsync(file);
+
       await alertSuccess({
         title: "Berhasil",
         message: "Avatar berhasil diperbarui.",
       });
+
       clearSelection();
       router.refresh();
     } catch (e) {
@@ -291,6 +306,9 @@ export default function AvatarSettingsClient() {
                   variant="outline"
                   className="gap-2"
                   onClick={onPickFile}
+                  disabled={
+                    updateAvatar.isPending || removing || removeAvatar.isPending
+                  }
                 >
                   <ImagePlus className="h-4 w-4" />
                   Choose photo
@@ -315,7 +333,7 @@ export default function AvatarSettingsClient() {
                   variant="outline"
                   className="gap-2"
                   onClick={clearSelection}
-                  disabled={!file && !previewUrl}
+                  disabled={(!file && !previewUrl) || updateAvatar.isPending}
                 >
                   Cancel
                 </Button>
@@ -338,11 +356,6 @@ export default function AvatarSettingsClient() {
                     </>
                   )}
                 </Button>
-              </div>
-
-              <div className="mt-3 text-xs text-muted-foreground">
-                Tip: kalau backend nggak crop ke square, users bakal upload foto
-                KTP landscape dan tetap salahin kamu.
               </div>
             </div>
           </div>
