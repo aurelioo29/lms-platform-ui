@@ -6,17 +6,16 @@ import {
   BookOpen,
   Bot,
   Command,
-  Frame,
   GalleryVerticalEnd,
-  Map,
-  PieChart,
   Settings2,
   SquareTerminal,
+  Activity,
+  UserPlus,
 } from "lucide-react";
 
 import { useMe } from "@/features/auth/use-auth";
 import { NavMain } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
+import { NavModerator } from "@/components/nav-moderator";
 import { NavUser } from "@/components/nav-user";
 import { TeamSwitcher } from "@/components/team-switcher";
 import {
@@ -26,6 +25,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { NavAdmin } from "./nav-admin";
 
 const data = {
   user: {
@@ -83,27 +83,47 @@ const data = {
       ],
     },
   ],
-  projects: [
-    { name: "Design Engineering", url: "#", icon: Frame },
-    { name: "Sales & Marketing", url: "#", icon: PieChart },
-    { name: "Travel", url: "#", icon: Map },
+
+  admins: [
+    {
+      title: "Manage Accounts",
+      url: "#",
+      icon: UserPlus,
+      isActive: false,
+      admins: [
+        { title: "Students", url: "/dashboard/admin/manage-accounts/students" },
+        { title: "Teachers", url: "/dashboard/admin/manage-accounts/teachers" },
+      ],
+    },
+  ],
+
+  moderator: [
+    {
+      name: "Activity Logs",
+      url: "/dashboard/moderator/activity-logs",
+      icon: Activity,
+    },
   ],
 };
 
 export function AppSidebar(props) {
-  const { data: meData, isLoading, isError } = useMe();
+  const { data: meData, isLoading } = useMe();
 
-  // ✅ pakai user dari API kalau ada, kalau belum ada pakai dummy
   const apiUser = meData?.user;
   const user = apiUser ?? data.user;
 
-  // optional: buat fallback teks saat loading/error
+  const role = apiUser?.role; // <= ini penting (pastikan backend kirim role)
+  const isDeveloper = role === "developer";
+  const isAdmin = role === "admin";
+  const isStudent = role === "student";
+
+  // aturan menu
+  const canSeeAdminMenu = isAdmin || isDeveloper;
+  const canSeeModeratorMenu = isDeveloper; // admin gak boleh
+
   const name = isLoading ? "Checking..." : (user?.name ?? "User");
   const email = isLoading ? "" : (user?.email ?? "");
   const avatar = user?.avatar ?? "/avatars/default-profile.png";
-
-  // Debug biar kamu tau datanya masuk apa nggak
-  // console.log("ME:", meData);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -112,18 +132,12 @@ export function AppSidebar(props) {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        {canSeeAdminMenu && <NavAdmin admins={data.admins} />}
+        {canSeeModeratorMenu && <NavModerator moderator={data.moderator} />}
       </SidebarContent>
 
       <SidebarFooter>
-        <NavUser
-          user={{
-            name,
-            email,
-            avatar,
-          }}
-        />
+        <NavUser user={{ name, email, avatar }} />
       </SidebarFooter>
 
       <SidebarRail />
