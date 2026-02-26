@@ -1,51 +1,85 @@
 "use client";
 
-import { useEffect } from "react";
-import { useQuill } from "react-quilljs";
-
+import { useEffect, useRef } from "react";
+import Quill from "quill";
 import "quill/dist/quill.snow.css";
 
-export default function QuillEditor({ value, onChange, height = 250 }) {
-  const { quill, quillRef } = useQuill({
-    theme: "snow",
+export default function QuillEditor({
+  value,
+  onChange,
+  height = 150,
+  placeholder = "Write a reply...",
+}) {
+  const wrapperRef = useRef(null);
+  const quillRef = useRef(null);
+  const lastValueRef = useRef(null);
 
-    modules: {
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-
-        ["bold", "italic", "underline"],
-
-        [{ list: "ordered" }, { list: "bullet" }],
-
-        ["link"],
-
-        ["clean"],
-      ],
-    },
-  });
-
-  // Load initial value
   useEffect(() => {
-    if (!quill) return;
-    if (!value) return;
+    if (!wrapperRef.current || quillRef.current) return;
 
-    quill.setContents(value);
-  }, [quill, value]);
+    // Create editor mount node
+    const editorEl = document.createElement("div");
+    wrapperRef.current.innerHTML = "";
+    wrapperRef.current.appendChild(editorEl);
 
-  // Listen changes
-  useEffect(() => {
-    if (!quill) return;
+    const quill = new Quill(editorEl, {
+      theme: "snow",
+      placeholder,
+      modules: {
+        toolbar: [
+          [{ header: [1, 2, 3, false] }],
+          ["bold", "italic", "underline"],
+          [{ list: "ordered" }, { list: "bullet" }],
+          ["link"],
+          ["clean"],
+        ],
+      },
+    });
+
+    // Set height to the actual quill container
+    const container = editorEl.querySelector(".ql-container");
+    if (container) container.style.height = `${height}px`;
+
+    quillRef.current = quill;
+
+    // Initial value
+    if (value) {
+      quill.setContents(value);
+      lastValueRef.current = value;
+    }
 
     quill.on("text-change", () => {
       const delta = quill.getContents();
-
+      lastValueRef.current = delta;
       onChange?.(delta);
     });
-  }, [quill, onChange]);
 
-  return (
-    <div className="border rounded-md overflow-hidden">
-      <div ref={quillRef} style={{ height }} />
-    </div>
-  );
+    return () => {
+      quillRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // If parent resets value (e.g., after submit setBodyJson(null))
+  useEffect(() => {
+    const quill = quillRef.current;
+    if (!quill) return;
+
+    // If value becomes null => clear editor
+    if (!value && lastValueRef.current) {
+      quill.setText("");
+      lastValueRef.current = null;
+      return;
+    }
+
+    // If parent sets a different delta (rare, but handle it)
+    if (value && value !== lastValueRef.current) {
+      const range = quill.getSelection(); // keep cursor if possible
+      quill.setContents(value);
+      if (range) quill.setSelection(range);
+      lastValueRef.current = value;
+    }
+  }, [value]);
+
+  return <div ref={wrapperRef} className="w-full" />;
 }
