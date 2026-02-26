@@ -14,6 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 
 function StatusPill({ status }) {
   if (status === "published") {
@@ -147,7 +148,12 @@ export function CoursesTable({
                     </TableCell>
 
                     <TableCell className="text-xs">
-                      <div className="font-medium">{r.title || "-"}</div>
+                      <Link
+                        href={`/courses/${r.slug}`}
+                        className="font-medium hover:underline"
+                      >
+                        {r.title || "-"}
+                      </Link>
                       {r.description ? (
                         <div className="mt-1 text-[11px] text-muted-foreground line-clamp-2">
                           {r.description}

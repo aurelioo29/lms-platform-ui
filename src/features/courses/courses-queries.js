@@ -9,6 +9,7 @@ import {
 export const coursesKeys = {
   all: ["courses"],
   adminList: (params) => [...coursesKeys.all, "admin", "list", params ?? {}],
+  bySlug: (slug) => [...coursesKeys.all, "slug", slug],
 };
 
 async function fetchAdminCourses(params = {}) {
@@ -101,3 +102,24 @@ export function useArchiveCourse() {
     onSuccess: () => qc.invalidateQueries({ queryKey: coursesKeys.all }),
   });
 }
+
+async function fetchCourseBySlug(slug) {
+  const res = await apiFetch(`/api/courses/slug/${slug}`);
+  return courseSchema.parse(res);
+}
+
+export function useCourseBySlug(slug) {
+  return useQuery({
+    queryKey: coursesKeys.bySlug(slug),
+    queryFn: () => fetchCourseBySlug(slug),
+    enabled: !!slug,
+  });
+}
+
+// add in coursesKeys
+bySlug: ((slug) => [...coursesKeys.all, "slug", slug],
+  // add fetch function
+  async function fetchCourseBySlug(slug) {
+    const res = await apiFetch(`/api/courses/slug/${slug}`);
+    return courseSchema.parse(res);
+  });
