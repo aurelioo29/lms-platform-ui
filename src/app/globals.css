@@ -228,3 +228,26 @@
     opacity: 1;
   }
 }
+
+.quill-readonly .ql-container {
+  border: 0 !important;
+}
+.quill-readonly .ql-editor {
+  padding: 0.75rem 1rem;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.quill-readonly .ql-editor h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0.75rem 0;
+}
+.quill-readonly .ql-editor h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0.6rem 0;
+}
+.quill-readonly .ql-editor ul,
+.quill-readonly .ql-editor ol {
+  padding-left: 1.25rem;
+}
