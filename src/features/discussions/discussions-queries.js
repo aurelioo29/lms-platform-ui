@@ -93,3 +93,22 @@ export function useCreateComment(discussionId) {
     },
   });
 }
+
+export function toggleReaction(payload) {
+  return apiFetch("/api/reactions/toggle", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function useToggleReaction(discussionId) {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: toggleReaction,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: discussionKeys.detail(discussionId) });
+      qc.invalidateQueries({ queryKey: discussionKeys.all }); // optional
+    },
+  });
+}

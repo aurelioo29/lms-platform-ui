@@ -5,6 +5,7 @@ import { Search, MessageSquare } from "lucide-react";
 
 import CreateDiscussionDialog from "./CreateDiscussionDialog";
 import CommentsPanel from "./CommentsPanel";
+import PostReactionBar from "./PostReactionBar";
 
 import {
   useCourseDiscussions,
@@ -61,7 +62,10 @@ export default function CourseDiscussionTab({ course }) {
   const items = useMemo(() => list, [list]);
 
   const selected = useDiscussionDetail(selectedId);
-  const discussion = selected.data; // <-- pastikan hook kamu return { data: { data: {...} } }
+
+  // Kalau hook kamu bentuknya axios: selected.data = { data: { ... } }
+  // Kita normalize biar pasti objek discussion:
+  const discussion = selected?.data?.data ?? selected?.data ?? null;
 
   // Auto-select first post if exists (optional)
   useEffect(() => {
@@ -184,6 +188,14 @@ export default function CourseDiscussionTab({ course }) {
 
                   <div className="mt-1 text-xs text-muted-foreground">
                     by {discussion?.user?.name ?? "Student"} • #{selectedId}
+                  </div>
+
+                  {/* ✅ Reaction bar: tepat bawah author line, atas body */}
+                  <div className="mt-3">
+                    <PostReactionBar
+                      discussion={discussion}
+                      discussionId={selectedId}
+                    />
                   </div>
 
                   <Separator className="my-4" />

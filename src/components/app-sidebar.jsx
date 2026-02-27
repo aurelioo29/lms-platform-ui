@@ -95,6 +95,19 @@ const data = {
         { title: "Teachers", url: "/dashboard/admin/manage-accounts/teachers" },
       ],
     },
+    {
+      title: "Manage Courses",
+      url: "#",
+      icon: BookOpen,
+      isActive: false,
+      admins: [
+        { title: "List Courses", url: "/dashboard/admin/manage-courses" },
+        {
+          title: "List Discussions",
+          url: "/dashboard/admin/manage-discussions",
+        },
+      ],
+    },
   ],
 
   moderator: [
