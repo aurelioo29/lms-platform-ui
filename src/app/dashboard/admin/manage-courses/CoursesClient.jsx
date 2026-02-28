@@ -14,6 +14,9 @@ import {
   useArchiveCourse,
 } from "@/features/courses/courses-queries";
 
+import { useAdminTeachers } from "@/features/teachers/teachers-queries";
+import { useAssignCourseInstructor } from "@/features/courses/course-instructors-queries";
+
 import { alertConfirm, alertSuccess, handleApiError } from "@/lib/ui/alerts";
 
 export default function CoursesClient({ initialList = null }) {
@@ -22,10 +25,8 @@ export default function CoursesClient({ initialList = null }) {
 
   const [openCreate, setOpenCreate] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
-  const [openPublish, setOpenPublish] = useState(false);
 
   const [editing, setEditing] = useState(null);
-  const [publishing, setPublishing] = useState(null);
 
   const params = useMemo(
     () => ({
@@ -36,6 +37,9 @@ export default function CoursesClient({ initialList = null }) {
   );
 
   const { data: listData, isLoading, error, refetch } = useAdminCourses(params);
+
+  const { data: teachers = [] } = useAdminTeachers();
+  const assignInstructorMut = useAssignCourseInstructor();
 
   const createMut = useCreateCourse();
   const updateMut = useUpdateCourse();
@@ -61,41 +65,70 @@ export default function CoursesClient({ initialList = null }) {
     createMut.isPending ||
     updateMut.isPending ||
     publishMut.isPending ||
-    archiveMut.isPending;
+    archiveMut.isPending ||
+    assignInstructorMut.isPending;
 
   const fetchList = useCallback(async () => {
     await refetch();
   }, [refetch]);
 
-  // ✅ Create: hide dialog first so SweetAlert is clickable
   const onCreate = useCallback(
     async (payload, { setFieldError } = {}) => {
+      // extract teacher fields (do NOT send to BE course store)
+      const teacherId = payload?.teacher_id ? Number(payload.teacher_id) : null;
+      const teacherRole = payload?.teacher_role || "main";
+
+      const coursePayload = { ...payload };
+      delete coursePayload.teacher_id;
+      delete coursePayload.teacher_role;
+
       try {
-        await createMut.mutateAsync(payload);
+        const created = await createMut.mutateAsync(coursePayload);
+
+        // assign teacher (optional)
+        if (teacherId) {
+          await assignInstructorMut.mutateAsync({
+            courseId: created.data.id,
+            userId: teacherId,
+            role: teacherRole,
+          });
+        }
 
         setOpenCreate(false);
         await new Promise((r) => setTimeout(r, 0));
-
         await alertSuccess({ message: "Course berhasil dibuat." });
         await fetchList();
       } catch (e) {
         setOpenCreate(false);
         await new Promise((r) => setTimeout(r, 0));
-
         await handleApiError(e, { setFieldError });
-
-        // optional re-open
         setOpenCreate(true);
         await new Promise((r) => setTimeout(r, 0));
       }
     },
-    [createMut, fetchList],
+    [createMut, assignInstructorMut, fetchList],
   );
 
   const onEdit = useCallback(
     async (id, payload, { setFieldError } = {}) => {
+      const teacherId = payload?.teacher_id ? Number(payload.teacher_id) : null;
+      const teacherRole = payload?.teacher_role || "main";
+
+      const coursePayload = { ...payload };
+      delete coursePayload.teacher_id;
+      delete coursePayload.teacher_role;
+
       try {
-        await updateMut.mutateAsync({ id, payload });
+        await updateMut.mutateAsync({ id, payload: coursePayload });
+
+        if (teacherId) {
+          await assignInstructorMut.mutateAsync({
+            courseId: id,
+            userId: teacherId,
+            role: teacherRole,
+          });
+        }
+
         await alertSuccess({ message: "Course berhasil diupdate." });
         setOpenEdit(false);
         setEditing(null);
@@ -104,22 +137,7 @@ export default function CoursesClient({ initialList = null }) {
         await handleApiError(e, { setFieldError });
       }
     },
-    [updateMut, fetchList],
-  );
-
-  const onPublish = useCallback(
-    async (id, payload, { setFieldError } = {}) => {
-      try {
-        await publishMut.mutateAsync({ id, payload });
-        await alertSuccess({ message: "Course berhasil dipublish." });
-        setOpenPublish(false);
-        setPublishing(null);
-        await fetchList();
-      } catch (e) {
-        await handleApiError(e, { setFieldError });
-      }
-    },
-    [publishMut, fetchList],
+    [updateMut, assignInstructorMut, fetchList],
   );
 
   const onArchive = useCallback(
@@ -161,6 +179,7 @@ export default function CoursesClient({ initialList = null }) {
             onOpenChange={setOpenCreate}
             onSubmit={onCreate}
             triggerLabel="New Course"
+            teachers={teachers}
           />
         </CardHeader>
 
@@ -178,10 +197,6 @@ export default function CoursesClient({ initialList = null }) {
               setEditing(row);
               setOpenEdit(true);
             }}
-            onPublish={(row) => {
-              setPublishing(row);
-              setOpenPublish(true);
-            }}
             onArchive={onArchive}
           />
         </CardContent>
@@ -196,19 +211,7 @@ export default function CoursesClient({ initialList = null }) {
         }}
         initial={editing}
         onSubmit={(payload, helpers) => onEdit(editing?.id, payload, helpers)}
-      />
-
-      <CourseFormDialog
-        mode="publish"
-        open={openPublish}
-        onOpenChange={(v) => {
-          setOpenPublish(v);
-          if (!v) setPublishing(null);
-        }}
-        initial={publishing}
-        onSubmit={(payload, helpers) =>
-          onPublish(publishing?.id, payload, helpers)
-        }
+        teachers={teachers}
       />
     </div>
   );

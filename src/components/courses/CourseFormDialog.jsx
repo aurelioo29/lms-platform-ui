@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ChevronDown, Search, X } from "lucide-react";
 
 import {
   Dialog,
@@ -32,22 +33,165 @@ import {
   courseEditSchema,
 } from "@/features/courses/course-schema";
 
-// util: generate readable key
 function generateEnrollKey(len = 10) {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no confusing 0/O/1/I
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let out = "";
   for (let i = 0; i < len; i++)
     out += chars[Math.floor(Math.random() * chars.length)];
   return out;
 }
 
+/**
+ * ✅ Custom Teacher Dropdown (No shadcn Select)
+ * - Stable inside Dialog
+ * - Searchable
+ * - Click outside closes
+ * - Controlled via RHF setValue + watch
+ */
+function TeacherDropdown({
+  teachers = [],
+  value, // teacher_id string
+  onChange,
+  disabled,
+  placeholder = "Select teacher",
+}) {
+  const wrapRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+
+  const selected = useMemo(() => {
+    if (!value) return null;
+    return teachers.find((t) => String(t.id) === String(value)) ?? null;
+  }, [teachers, value]);
+
+  const filtered = useMemo(() => {
+    const qq = (q ?? "").trim().toLowerCase();
+    if (!qq) return teachers;
+    return teachers.filter((t) =>
+      String(t?.name ?? "")
+        .toLowerCase()
+        .includes(qq),
+    );
+  }, [teachers, q]);
+
+  // click outside to close
+  useEffect(() => {
+    function onDocMouseDown(e) {
+      if (!open) return;
+      if (!wrapRef.current) return;
+      if (!wrapRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [open]);
+
+  // close on ESC
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (!open) return;
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  const label = selected ? selected.name : placeholder;
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      {/* Trigger */}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        className={[
+          "flex h-10 w-full items-center justify-between gap-2 rounded-md border px-3 text-left text-sm",
+          "bg-background hover:bg-accent/40",
+          "disabled:cursor-not-allowed disabled:opacity-60",
+          open ? "ring-2 ring-ring ring-offset-2 ring-offset-background" : "",
+        ].join(" ")}
+      >
+        <span className={selected ? "" : "text-muted-foreground"}>{label}</span>
+        <ChevronDown
+          className={["h-4 w-4 opacity-70", open ? "rotate-180" : ""].join(" ")}
+        />
+      </button>
+
+      {/* Panel */}
+      {open ? (
+        <div className="absolute left-0 top-[calc(100%+8px)] z-[200] w-full rounded-md border bg-background shadow-lg">
+          {/* Search */}
+          <div className="flex items-center gap-2 border-b px-2 py-2">
+            <Search className="h-4 w-4 opacity-60" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search teacher..."
+              className="h-8 w-full bg-transparent text-sm outline-none"
+              autoFocus
+            />
+            {q ? (
+              <button
+                type="button"
+                className="rounded p-1 hover:bg-accent"
+                onClick={() => setQ("")}
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4 opacity-70" />
+              </button>
+            ) : null}
+          </div>
+
+          {/* Items */}
+          <div className="max-h-56 overflow-auto p-1">
+            {filtered.length ? (
+              filtered.map((t) => {
+                const id = String(t.id);
+                const active = String(value || "") === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => {
+                      onChange?.(id);
+                      setOpen(false);
+                      setQ("");
+                    }}
+                    className={[
+                      "flex w-full items-center justify-between rounded-md px-2 py-2 text-sm",
+                      "hover:bg-accent",
+                      active ? "bg-accent" : "",
+                    ].join(" ")}
+                  >
+                    <span className="truncate">{t.name}</span>
+                    {active ? (
+                      <span className="text-xs text-muted-foreground">
+                        selected
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-2 py-3 text-sm text-muted-foreground">
+                No teachers found
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function CourseFormDialog({
-  mode = "create", // "create" | "edit"
+  mode = "create",
   open,
   onOpenChange,
   initial,
   onSubmit,
   triggerLabel = "New Course",
+  teachers = [],
 }) {
   const isEdit = mode === "edit";
   const schema = isEdit ? courseEditSchema : courseCreateSchema;
@@ -58,6 +202,10 @@ export function CourseFormDialog({
       description: initial?.description ?? "",
       status: initial?.status ?? "draft",
       enroll_key: "",
+
+      // store teacher_id as string for FE
+      teacher_id: initial?.teacher_id ? String(initial.teacher_id) : "",
+      teacher_role: initial?.teacher_role ?? "main",
     }),
     [initial],
   );
@@ -74,9 +222,11 @@ export function CourseFormDialog({
     reset,
     setError,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = form;
 
+  // reset when dialog opens
   useEffect(() => {
     if (!open) return;
     reset(defaultValues);
@@ -92,15 +242,22 @@ export function CourseFormDialog({
       description: (values.description ?? "").trim() || null,
       status: values.status,
       enroll_key: (values.enroll_key ?? "").trim() || null,
+
+      teacher_id: values.teacher_id ?? "",
+      teacher_role: values.teacher_role ?? "main",
     };
 
     await onSubmit?.(payload, { setFieldError });
   }
 
-  const title = isEdit ? "Edit Course" : "Create Course";
-  const desc = isEdit
-    ? "Update course info. You can also change status."
-    : "Create a new course. Yes, you can publish immediately—because we’re efficient now.";
+  const dialogTitle = isEdit ? "Edit Course" : "Create Course";
+  const dialogDesc = isEdit
+    ? "Update course info."
+    : "Create a new course. Try not to create 47 drafts and call it ‘versioning’.";
+
+  const statusVal = watch("status") || "draft";
+  const roleVal = watch("teacher_role") || "main";
+  const teacherIdVal = watch("teacher_id") || "";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,8 +269,8 @@ export function CourseFormDialog({
 
       <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{desc}</DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDesc}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(submit)} className="space-y-5">
@@ -149,17 +306,17 @@ export function CourseFormDialog({
               </p>
             ) : (
               <p className="text-[11px] text-muted-foreground">
-                Optional. Unlike the bugs.
+                Optional. Unlike validation.
               </p>
             )}
           </div>
 
-          {/* Status (shadcn Select) */}
+          {/* Status */}
           <div className="space-y-2">
             <Label>Status</Label>
             <Select
               disabled={isSubmitting}
-              defaultValue={defaultValues.status}
+              value={statusVal}
               onValueChange={(v) =>
                 setValue("status", v, {
                   shouldDirty: true,
@@ -170,14 +327,13 @@ export function CourseFormDialog({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[80]">
                 <SelectItem value="draft">draft</SelectItem>
                 <SelectItem value="published">published</SelectItem>
                 <SelectItem value="archived">archived</SelectItem>
               </SelectContent>
             </Select>
 
-            {/* hidden input to keep RHF happy */}
             <input type="hidden" {...register("status")} />
 
             {errors.status ? (
@@ -187,7 +343,60 @@ export function CourseFormDialog({
             ) : null}
           </div>
 
-          {/* Enroll key (clean layout) */}
+          {/* Teacher (✅ custom dropdown) */}
+          <div className="space-y-2">
+            <Label>Teacher</Label>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <TeacherDropdown
+                teachers={teachers}
+                value={teacherIdVal}
+                disabled={isSubmitting}
+                onChange={(id) =>
+                  setValue("teacher_id", id, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                placeholder="Select teacher"
+              />
+
+              <Select
+                disabled={isSubmitting}
+                value={roleVal}
+                onValueChange={(v) =>
+                  setValue("teacher_role", v, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Role" />
+                </SelectTrigger>
+                <SelectContent className="z-[80]">
+                  <SelectItem value="main">main</SelectItem>
+                  <SelectItem value="assistant">assistant</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* hidden inputs for RHF */}
+            <input type="hidden" {...register("teacher_id")} />
+            <input type="hidden" {...register("teacher_role")} />
+
+            {errors.teacher_id ? (
+              <p className="text-xs text-destructive">
+                {String(errors.teacher_id.message)}
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Teacher will be assigned after course is saved.
+              </p>
+            )}
+          </div>
+
+          {/* Enroll key */}
           <div className="space-y-2">
             <Label htmlFor="enroll_key">Enroll Key</Label>
 
@@ -219,12 +428,7 @@ export function CourseFormDialog({
               <p className="text-xs text-destructive">
                 {String(errors.enroll_key.message)}
               </p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                If you want table “Copy key” later, backend must return/store
-                the plain key. Hash alone can’t be copied.
-              </p>
-            )}
+            ) : null}
           </div>
 
           <DialogFooter className="gap-2">

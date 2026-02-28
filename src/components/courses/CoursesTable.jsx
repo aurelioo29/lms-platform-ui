@@ -38,11 +38,28 @@ function StatusPill({ status }) {
   );
 }
 
-function maskKey(key) {
-  if (!key) return "-";
-  if (key.length <= 4) return "••••";
-  const last4 = key.slice(-4);
-  return `••••••-${last4}`;
+// ✅ Normalize instructors from any possible key
+function getInstructors(course) {
+  const raw =
+    course?.courseInstructors ??
+    course?.course_instructors ??
+    course?.instructors ??
+    [];
+
+  return Array.isArray(raw) ? raw : [];
+}
+
+function getInstructorName(ci) {
+  return (
+    ci?.instructor?.name ??
+    ci?.user?.name ?? // fallback kalau BE pernah pakai "user"
+    null
+  );
+}
+
+function roleLabel(role) {
+  if (role === "assistant") return "Assistant";
+  return "Main";
 }
 
 export function CoursesTable({
@@ -119,6 +136,7 @@ export function CoursesTable({
               <TableHead className="w-[300px]">Course</TableHead>
               <TableHead className="w-[190px]">Enroll Key</TableHead>
               <TableHead className="w-[160px]">Status</TableHead>
+              <TableHead className="w-[220px]">Teachers</TableHead>
               <TableHead className="w-[120px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -140,6 +158,15 @@ export function CoursesTable({
               filtered.map((r) => {
                 const keyPlain = r.enroll_key_plain;
                 const hasPlainKey = !!keyPlain;
+
+                const instructors = getInstructors(r)
+                  // ✅ buang yang ga punya nama sama sekali
+                  .map((ci) => ({
+                    id: ci?.id,
+                    name: getInstructorName(ci),
+                    role: ci?.role ?? "main",
+                  }))
+                  .filter((x) => !!x.name);
 
                 return (
                   <TableRow key={r.id} className="align-top">
@@ -167,37 +194,53 @@ export function CoursesTable({
 
                     {/* Enroll Key column */}
                     <TableCell className="text-xs">
-                      {(() => {
-                        const keyPlain = r.enroll_key_plain;
-                        const hasPlainKey = !!keyPlain;
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-mono">
+                          {keyPlain ? keyPlain : "—"}
+                        </div>
 
-                        return (
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="font-mono">
-                              {keyPlain ? keyPlain : "—"}
-                            </div>
-
-                            <button
-                              type="button"
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md border hover:bg-muted disabled:opacity-50"
-                              disabled={!hasPlainKey}
-                              onClick={() => copy(keyPlain)}
-                              title={
-                                hasPlainKey
-                                  ? "Copy enroll key"
-                                  : "No enroll key set"
-                              }
-                              aria-label="Copy enroll key"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </button>
-                          </div>
-                        );
-                      })()}
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border hover:bg-muted disabled:opacity-50"
+                          disabled={!hasPlainKey}
+                          onClick={() => copy(keyPlain)}
+                          title={
+                            hasPlainKey
+                              ? "Copy enroll key"
+                              : "No enroll key set"
+                          }
+                          aria-label="Copy enroll key"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </div>
                     </TableCell>
 
                     <TableCell className="text-xs">
                       <StatusPill status={r.status} />
+                    </TableCell>
+
+                    {/* ✅ Teachers */}
+                    <TableCell>
+                      {instructors.length === 0 ? (
+                        <span className="text-[11px] text-muted-foreground">
+                          No teachers assigned
+                        </span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {instructors.map((t, idx) => (
+                            <span
+                              key={`${r.id}-ci-${t.id ?? idx}`}
+                              className="inline-flex items-center gap-1 rounded-full bg-muted/20 px-2 py-0.5 text-[11px]"
+                            >
+                              {t.name}
+                              <span className="rounded border px-1 text-[10px]">
+                                {roleLabel(t.role)}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </TableCell>
 
                     <TableCell className="text-right">

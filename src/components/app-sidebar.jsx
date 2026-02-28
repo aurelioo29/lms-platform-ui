@@ -4,13 +4,11 @@ import * as React from "react";
 import {
   AudioWaveform,
   BookOpen,
-  Bot,
   Command,
   GalleryVerticalEnd,
-  Settings2,
-  SquareTerminal,
   Activity,
   UserPlus,
+  BookMarked,
 } from "lucide-react";
 
 import { useMe } from "@/features/auth/use-auth";
@@ -38,49 +36,17 @@ const data = {
     { name: "Acme Corp.", logo: AudioWaveform, plan: "Startup" },
     { name: "Evil Corp.", logo: Command, plan: "Free" },
   ],
-  navMain: [
+
+  mainCourse: [
     {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        { title: "History", url: "#" },
-        { title: "Starred", url: "#" },
-        { title: "Settings", url: "#" },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        { title: "Genesis", url: "#" },
-        { title: "Explorer", url: "#" },
-        { title: "Quantum", url: "#" },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
+      name: "List Courses",
+      url: "/dashboard/courses",
       icon: BookOpen,
-      items: [
-        { title: "Introduction", url: "#" },
-        { title: "Get Started", url: "#" },
-        { title: "Tutorials", url: "#" },
-        { title: "Changelog", url: "#" },
-      ],
     },
     {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        { title: "General", url: "#" },
-        { title: "Team", url: "#" },
-        { title: "Billing", url: "#" },
-        { title: "Limits", url: "#" },
-      ],
+      name: "My Courses",
+      url: "/dashboard/my-courses",
+      icon: BookMarked,
     },
   ],
 
@@ -129,10 +95,12 @@ export function AppSidebar(props) {
   const isDeveloper = role === "developer";
   const isAdmin = role === "admin";
   const isStudent = role === "student";
+  const isTeacher = role === "teacher";
 
   // aturan menu
   const canSeeAdminMenu = isAdmin || isDeveloper;
   const canSeeModeratorMenu = isDeveloper; // admin gak boleh
+  const canSeeMainCourse = isStudent || isAdmin || isDeveloper || isTeacher; // semua role boleh lihat main course
 
   const name = isLoading ? "Checking..." : (user?.name ?? "User");
   const email = isLoading ? "" : (user?.email ?? "");
@@ -145,6 +113,7 @@ export function AppSidebar(props) {
       </SidebarHeader>
 
       <SidebarContent>
+        {canSeeMainCourse && <NavMain items={data.mainCourse} />}
         {canSeeAdminMenu && <NavAdmin admins={data.admins} />}
         {canSeeModeratorMenu && <NavModerator moderator={data.moderator} />}
       </SidebarContent>
