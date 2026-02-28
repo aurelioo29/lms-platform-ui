@@ -31,6 +31,11 @@ export const courseSchema = z.object({
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
 
+  is_enrolled: z
+    .union([z.boolean(), z.number()])
+    .optional()
+    .transform((v) => !!v),
+
   // ✅ ADD THESE (biar ga ke-strip)
   courseInstructors: z.array(courseInstructorSchema).optional().default([]),
   course_instructors: z.array(courseInstructorSchema).optional().default([]),

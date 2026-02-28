@@ -26,7 +26,7 @@ function TeacherRow({ name, roleLabel }) {
   );
 }
 
-export default function CourseCard({ course, onEnroll }) {
+export default function CourseCard({ course, onEnroll, isEnrolled = false }) {
   const list = course?.courseInstructors ?? course?.course_instructors ?? [];
 
   const teachers = list
@@ -81,8 +81,13 @@ export default function CourseCard({ course, onEnroll }) {
         </div>
 
         <div className="flex gap-2 pt-1">
-          <Button className="flex-1" onClick={() => onEnroll?.(course)}>
-            Enroll
+          <Button
+            className="flex-1"
+            onClick={() => onEnroll?.(course)}
+            disabled={isEnrolled}
+            variant={isEnrolled ? "secondary" : "default"}
+          >
+            {isEnrolled ? "Enrolled" : "Enroll"}
           </Button>
         </div>
       </CardContent>

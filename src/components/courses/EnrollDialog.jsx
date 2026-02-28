@@ -16,7 +16,12 @@ import {
 
 import { useEnrollWithKey } from "@/features/enrollments/enrollment-queries";
 
-export default function EnrollDialog({ open, onOpenChange, course }) {
+export default function EnrollDialog({
+  open,
+  onOpenChange,
+  course,
+  onSuccess,
+}) {
   const [key, setKey] = useState("");
   const enrollMutation = useEnrollWithKey();
 
@@ -31,24 +36,27 @@ export default function EnrollDialog({ open, onOpenChange, course }) {
       await enrollMutation.mutateAsync({
         courseId: course.id,
         enroll_key: key.trim(),
-        // optional kalau kamu mau invalidate detail by slug:
         slug: course.slug,
       });
 
       await Swal.fire({
         icon: "success",
-        title: "Enrolled!",
-        text: "You have been successfully enrolled in this course.",
+        title: "Enrolled ✅",
+        text: "Welcome to the course. No refunds. (jk)",
         timer: 1300,
         showConfirmButton: false,
       });
 
+      // ✅ tell parent: this course is now enrolled
+      onSuccess?.(course.id);
+
       onOpenChange(false);
     } catch (err) {
       const msg =
+        err?.data?.errors?.enroll_key?.[0] ||
+        err?.data?.message ||
         err?.message ||
-        err?.response?.data?.message ||
-        "Enroll gagal. Cek enroll key kamu.";
+        "Enroll failed. Check your key.";
 
       Swal.fire({
         icon: "error",

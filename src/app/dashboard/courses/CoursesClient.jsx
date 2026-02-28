@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import Swal from "sweetalert2";
 
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,7 +13,6 @@ import CourseCard from "@/components/courses/CourseCard";
 import EnrollDialog from "@/components/courses/EnrollDialog";
 
 import { usePublishedCourses } from "@/features/courses/courses-queries";
-import { useEnrollWithKey } from "@/features/enrollments/enrollment-queries";
 
 function useDebouncedValue(value, delay = 350) {
   const [debounced, setDebounced] = useState(value);
@@ -48,8 +46,6 @@ function CourseCardSkeleton() {
           <Skeleton className="h-9 flex-1 rounded-md" />
         </div>
       </CardContent>
-
-      <div className="h-1 w-full bg-gradient-to-r from-transparent via-muted to-transparent opacity-60" />
     </Card>
   );
 }
@@ -57,6 +53,9 @@ function CourseCardSkeleton() {
 export default function CoursesClient({ initialQuery = "" }) {
   const [q, setQ] = useState(initialQuery);
   const debouncedQ = useDebouncedValue(q, 350);
+
+  // ✅ stores enrolled course IDs in memory (Option B)
+  const [enrolledIds, setEnrolledIds] = useState(() => new Set());
 
   const queryParam = useMemo(() => {
     const trimmed = debouncedQ?.trim();
@@ -70,8 +69,6 @@ export default function CoursesClient({ initialQuery = "" }) {
     error,
   } = usePublishedCourses({ q: queryParam });
 
-  const enrollMutation = useEnrollWithKey();
-
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
@@ -80,46 +77,17 @@ export default function CoursesClient({ initialQuery = "" }) {
     if (!next) setSelected(null);
   }
 
-  async function handleEnrollSubmit(enroll_key) {
-    if (!selected?.id) return;
+  function handleEnrollClick(course) {
+    // ✅ already enrolled => do nothing
+    if (enrolledIds.has(course.id)) return;
 
-    try {
-      await enrollMutation.mutateAsync({
-        courseId: selected.id,
-        enroll_key,
-        // optional kalau kamu butuh invalidate by slug:
-        slug: selected.slug,
-      });
-
-      setOpen(false);
-
-      await Swal.fire({
-        icon: "success",
-        title: "Enrolled ✅",
-        text: "Kamu sekarang resmi jadi penghuni course ini.",
-        timer: 1300,
-        showConfirmButton: false,
-      });
-    } catch (e) {
-      // Laravel validation error biasanya: e.data.errors.enroll_key[0]
-      const msg =
-        e?.data?.errors?.enroll_key?.[0] ||
-        e?.data?.message ||
-        e?.message ||
-        "Enroll failed";
-
-      Swal.fire({
-        icon: "error",
-        title: "Enroll failed",
-        text: msg,
-      });
-    }
+    setSelected(course);
+    setOpen(true);
   }
 
   return (
     <div className="w-full">
       <div className="mx-auto w-full px-4 py-6 sm:px-6 lg:px-8">
-        {/* ===== Header ===== */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -154,7 +122,6 @@ export default function CoursesClient({ initialQuery = "" }) {
 
         <Separator className="my-6" />
 
-        {/* ===== Error ===== */}
         {isError ? (
           <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm">
             <div className="font-semibold text-red-800">
@@ -166,7 +133,6 @@ export default function CoursesClient({ initialQuery = "" }) {
           </div>
         ) : null}
 
-        {/* ===== Grid ===== */}
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {isLoading
             ? Array.from({ length: 6 }).map((_, i) => (
@@ -176,6 +142,7 @@ export default function CoursesClient({ initialQuery = "" }) {
                 <CourseCard
                   key={course.id}
                   course={course}
+                  isEnrolled={!!course.is_enrolled}
                   onEnroll={(c) => {
                     setSelected(c);
                     setOpen(true);
@@ -184,13 +151,9 @@ export default function CoursesClient({ initialQuery = "" }) {
               ))}
         </div>
 
-        {/* ===== Empty ===== */}
         {!isLoading && courses.length === 0 ? (
           <Card className="mt-10">
             <CardContent className="p-8 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border bg-muted/20">
-                <Search className="h-5 w-5 text-muted-foreground" />
-              </div>
               <div className="text-sm font-semibold">No courses found</div>
               <div className="mt-1 text-sm text-muted-foreground">
                 Try a different keyword, or ask admin to publish some courses.
@@ -199,12 +162,18 @@ export default function CoursesClient({ initialQuery = "" }) {
           </Card>
         ) : null}
 
-        {/* ===== Enroll Modal ===== */}
         {selected ? (
           <EnrollDialog
             open={open}
             onOpenChange={handleOpenChange}
             course={selected}
+            onSuccess={(courseId) => {
+              setEnrolledIds((prev) => {
+                const next = new Set(prev);
+                next.add(courseId);
+                return next;
+              });
+            }}
           />
         ) : null}
       </div>
