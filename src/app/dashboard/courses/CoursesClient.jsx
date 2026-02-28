@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import Swal from "sweetalert2";
 
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,10 +12,9 @@ import { Separator } from "@/components/ui/separator";
 
 import CourseCard from "@/components/courses/CourseCard";
 import EnrollDialog from "@/components/courses/EnrollDialog";
-import {
-  useEnrollWithKey,
-  usePublishedCourses,
-} from "@/features/courses/courses-queries";
+
+import { usePublishedCourses } from "@/features/courses/courses-queries";
+import { useEnrollWithKey } from "@/features/enrollments/enrollment-queries";
 
 function useDebouncedValue(value, delay = 350) {
   const [debounced, setDebounced] = useState(value);
@@ -30,7 +30,7 @@ function useDebouncedValue(value, delay = 350) {
 function CourseCardSkeleton() {
   return (
     <Card className="overflow-hidden">
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="space-y-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <Skeleton className="h-5 w-20 rounded-full" />
         </div>
@@ -44,7 +44,6 @@ function CourseCardSkeleton() {
         </div>
 
         <Skeleton className="h-16 w-full rounded-xl" />
-
         <div className="flex gap-2 pt-1">
           <Skeleton className="h-9 flex-1 rounded-md" />
         </div>
@@ -69,21 +68,59 @@ export default function CoursesClient({ initialQuery = "" }) {
     isLoading,
     isError,
     error,
-  } = usePublishedCourses({
-    q: queryParam,
-  });
+  } = usePublishedCourses({ q: queryParam });
 
   const enrollMutation = useEnrollWithKey();
 
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
+  function handleOpenChange(next) {
+    setOpen(next);
+    if (!next) setSelected(null);
+  }
+
+  async function handleEnrollSubmit(enroll_key) {
+    if (!selected?.id) return;
+
+    try {
+      await enrollMutation.mutateAsync({
+        courseId: selected.id,
+        enroll_key,
+        // optional kalau kamu butuh invalidate by slug:
+        slug: selected.slug,
+      });
+
+      setOpen(false);
+
+      await Swal.fire({
+        icon: "success",
+        title: "Enrolled ✅",
+        text: "Kamu sekarang resmi jadi penghuni course ini.",
+        timer: 1300,
+        showConfirmButton: false,
+      });
+    } catch (e) {
+      // Laravel validation error biasanya: e.data.errors.enroll_key[0]
+      const msg =
+        e?.data?.errors?.enroll_key?.[0] ||
+        e?.data?.message ||
+        e?.message ||
+        "Enroll failed";
+
+      Swal.fire({
+        icon: "error",
+        title: "Enroll failed",
+        text: msg,
+      });
+    }
+  }
+
   return (
     <div className="w-full">
       <div className="mx-auto w-full px-4 py-6 sm:px-6 lg:px-8">
-        {/* ===== Header (Title left, Search right) ===== */}
+        {/* ===== Header ===== */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          {/* Left */}
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight">
               List All Courses
@@ -92,7 +129,7 @@ export default function CoursesClient({ initialQuery = "" }) {
               Browse published courses and enroll using an enrollment key.
             </p>
 
-            <div className="pt-2 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 pt-2">
               <Badge variant="secondary" className="text-[11px]">
                 Published only
               </Badge>
@@ -102,7 +139,6 @@ export default function CoursesClient({ initialQuery = "" }) {
             </div>
           </div>
 
-          {/* Right: Search */}
           <div className="w-full sm:w-auto">
             <div className="relative w-full sm:w-[360px]">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -164,33 +200,13 @@ export default function CoursesClient({ initialQuery = "" }) {
         ) : null}
 
         {/* ===== Enroll Modal ===== */}
-        <EnrollDialog
-          open={open}
-          onOpenChange={setOpen}
-          courseTitle={selected?.title || "-"}
-          isLoading={enrollMutation.isPending}
-          onSubmit={async (enroll_key) => {
-            if (!selected) return;
-
-            try {
-              await enrollMutation.mutateAsync({
-                courseId: selected.id,
-                enroll_key,
-              });
-
-              setOpen(false);
-              alert("Enrolled successfully ✅");
-            } catch (e) {
-              const msg =
-                e?.data?.errors?.enroll_key?.[0] ||
-                e?.data?.enroll_key?.[0] ||
-                e?.message ||
-                "Enroll failed";
-
-              alert(msg);
-            }
-          }}
-        />
+        {selected ? (
+          <EnrollDialog
+            open={open}
+            onOpenChange={handleOpenChange}
+            course={selected}
+          />
+        ) : null}
       </div>
     </div>
   );

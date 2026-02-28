@@ -50,14 +50,13 @@ export default function CourseCard({ course, onEnroll }) {
             <BookOpen className="h-5 w-5" />
           </div>
 
-          <div className="min-w-auto">
+          <div className="min-w-0">
             <div className="line-clamp-2 text-base font-semibold">
-              {course.title}
+              {course?.title ?? "-"}
             </div>
           </div>
         </div>
 
-        {/* ✅ Teacher section from DB */}
         <div className="rounded-xl border bg-muted/20 p-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold">
             <UserRound className="h-4 w-4 text-muted-foreground" />
@@ -82,7 +81,7 @@ export default function CourseCard({ course, onEnroll }) {
         </div>
 
         <div className="flex gap-2 pt-1">
-          <Button className="flex-1" onClick={() => onEnroll(course)}>
+          <Button className="flex-1" onClick={() => onEnroll?.(course)}>
             Enroll
           </Button>
         </div>

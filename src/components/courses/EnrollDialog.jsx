@@ -1,70 +1,107 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Swal from "sweetalert2";
+import { KeyRound } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
-export default function EnrollDialog({
-  open,
-  onOpenChange,
-  courseTitle,
-  isLoading,
-  onSubmit,
-}) {
+import { useEnrollWithKey } from "@/features/enrollments/enrollment-queries";
+
+export default function EnrollDialog({ open, onOpenChange, course }) {
   const [key, setKey] = useState("");
+  const enrollMutation = useEnrollWithKey();
 
   useEffect(() => {
     if (!open) setKey("");
-  }, [open]);
+  }, [open, course?.id]);
+
+  async function submit() {
+    if (!course?.id) return;
+
+    try {
+      await enrollMutation.mutateAsync({
+        courseId: course.id,
+        enroll_key: key.trim(),
+        // optional kalau kamu mau invalidate detail by slug:
+        slug: course.slug,
+      });
+
+      await Swal.fire({
+        icon: "success",
+        title: "Enrolled!",
+        text: "You have been successfully enrolled in this course.",
+        timer: 1300,
+        showConfirmButton: false,
+      });
+
+      onOpenChange(false);
+    } catch (err) {
+      const msg =
+        err?.message ||
+        err?.response?.data?.message ||
+        "Enroll gagal. Cek enroll key kamu.";
+
+      Swal.fire({
+        icon: "error",
+        title: "Enroll failed",
+        text: msg,
+      });
+    }
+  }
+
+  const loading = enrollMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Enroll Course</DialogTitle>
-          <DialogDescription>
-            Masukkan enrollment key untuk:{" "}
-            <span className="font-medium text-foreground">{courseTitle}</span>
-          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Enrollment Key</label>
-            <Input
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              placeholder="contoh: ABCD1234"
-              autoFocus
-            />
-            <p className="text-xs text-muted-foreground">
-              Key ini dari admin / instructor. Jangan pakai “feeling”.
-            </p>
-          </div>
+          <div className="text-sm font-medium">{course?.title ?? "-"}</div>
 
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => onSubmit(key)}
-              disabled={isLoading || !key.trim()}
-            >
-              {isLoading ? "Enrolling..." : "Enroll"}
-            </Button>
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-muted-foreground">
+              Enroll Key
+            </div>
+
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Enter enroll key..."
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+              />
+            </div>
           </div>
         </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={loading || !key.trim()}>
+            {loading ? "Enrolling..." : "Enroll"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
