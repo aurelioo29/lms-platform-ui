@@ -12,12 +12,11 @@ export default function QuillEditor({
 }) {
   const wrapperRef = useRef(null);
   const quillRef = useRef(null);
-  const lastValueRef = useRef(null);
+  const lastJsonRef = useRef(""); // store serialized delta to compare
 
   useEffect(() => {
     if (!wrapperRef.current || quillRef.current) return;
 
-    // Create editor mount node
     const editorEl = document.createElement("div");
     wrapperRef.current.innerHTML = "";
     wrapperRef.current.appendChild(editorEl);
@@ -36,49 +35,55 @@ export default function QuillEditor({
       },
     });
 
-    // Set height to the actual quill container
+    // set height
     const container = editorEl.querySelector(".ql-container");
     if (container) container.style.height = `${height}px`;
 
     quillRef.current = quill;
 
-    // Initial value
+    // Initial value (SILENT)
     if (value) {
-      quill.setContents(value);
-      lastValueRef.current = value;
+      quill.setContents(value, "silent");
+      lastJsonRef.current = JSON.stringify(value);
+    } else {
+      quill.setContents([], "silent");
+      lastJsonRef.current = "";
     }
 
-    quill.on("text-change", () => {
-      const delta = quill.getContents();
-      lastValueRef.current = delta;
-      onChange?.(delta);
+    quill.on("text-change", (delta, oldDelta, source) => {
+      if (source === "silent") return; // ✅ ignore programmatic updates
+      const next = quill.getContents();
+      lastJsonRef.current = JSON.stringify(next);
+      onChange?.(next);
     });
 
     return () => {
       quillRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // ok to init once
 
-  // If parent resets value (e.g., after submit setBodyJson(null))
+  // Sync external value -> editor (SILENT + safe compare)
   useEffect(() => {
     const quill = quillRef.current;
     if (!quill) return;
 
-    // If value becomes null => clear editor
-    if (!value && lastValueRef.current) {
-      quill.setText("");
-      lastValueRef.current = null;
-      return;
+    // normalize
+    const next = value ?? null;
+    const nextJson = next ? JSON.stringify(next) : "";
+
+    if (nextJson === lastJsonRef.current) return; // ✅ no change
+
+    const range = quill.getSelection();
+
+    if (!next) {
+      quill.setContents([], "silent"); // ✅ clear silently
+      lastJsonRef.current = "";
+    } else {
+      quill.setContents(next, "silent"); // ✅ set silently
+      lastJsonRef.current = nextJson;
     }
 
-    // If parent sets a different delta (rare, but handle it)
-    if (value && value !== lastValueRef.current) {
-      const range = quill.getSelection(); // keep cursor if possible
-      quill.setContents(value);
-      if (range) quill.setSelection(range);
-      lastValueRef.current = value;
-    }
+    if (range) quill.setSelection(range);
   }, [value]);
 
   return <div ref={wrapperRef} className="w-full" />;
