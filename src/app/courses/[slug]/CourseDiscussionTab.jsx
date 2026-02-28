@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Search, MessageSquare } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 import CreateDiscussionDialog from "./CreateDiscussionDialog";
 import CommentsPanel from "./CommentsPanel";
@@ -36,6 +37,9 @@ function EmptyPost() {
 }
 
 export default function CourseDiscussionTab({ course }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   const courseId = course?.id;
 
   const [q, setQ] = useState("");
@@ -44,11 +48,19 @@ export default function CourseDiscussionTab({ course }) {
   // cooldown seconds for creating new post
   const [cooldown, setCooldown] = useState(0);
 
+  // decrement cooldown
   useEffect(() => {
     if (cooldown <= 0) return;
     const t = setInterval(() => setCooldown((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(t);
   }, [cooldown]);
+
+  // deep-link id from URL
+  const urlDiscussionId = useMemo(() => {
+    const raw = searchParams.get("discussion_id");
+    const n = Number(raw || 0);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [searchParams]);
 
   const {
     data: discussionsRes,
@@ -57,22 +69,50 @@ export default function CourseDiscussionTab({ course }) {
     refetch,
   } = useCourseDiscussions(courseId, { q, per_page: 50 });
 
-  // Laravel paginate default: { data: { current_page..., data: [...] } }
-  const list = discussionsRes?.data?.data ?? [];
-  const items = useMemo(() => list, [list]);
+  // Laravel paginate: { data: { data: [...] } }
+  const items = useMemo(() => {
+    const list = discussionsRes?.data?.data ?? [];
+    return Array.isArray(list) ? list : [];
+  }, [discussionsRes]);
 
-  const selected = useDiscussionDetail(selectedId);
+  // helper: sync URL (tab + discussion_id) without navigation jump
+  const syncUrl = useCallback(
+    (id) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("tab", "discussion");
+      if (id) sp.set("discussion_id", String(id));
+      else sp.delete("discussion_id");
+      router.replace(`?${sp.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
 
-  // Kalau hook kamu bentuknya axios: selected.data = { data: { ... } }
-  // Kita normalize biar pasti objek discussion:
-  const discussion = selected?.data?.data ?? selected?.data ?? null;
-
-  // Auto-select first post if exists (optional)
+  // ✅ select based on URL first, else fallback to first item
   useEffect(() => {
-    if (!selectedId && items.length > 0) {
+    if (items.length === 0) return;
+
+    // If URL has discussion_id, prioritize it
+    if (urlDiscussionId) {
+      const exists = items.some((x) => x.id === urlDiscussionId);
+      if (exists) {
+        if (selectedId !== urlDiscussionId) {
+          setSelectedId(urlDiscussionId);
+        }
+        return;
+      }
+    }
+
+    // Fallback: pick first post
+    if (!selectedId) {
       setSelectedId(items[0].id);
     }
-  }, [items, selectedId]);
+  }, [items, urlDiscussionId, selectedId]);
+
+  // Detail query
+  const selected = useDiscussionDetail(selectedId);
+
+  // Normalize returned detail
+  const discussion = selected?.data?.data ?? selected?.data ?? null;
 
   return (
     <div className="h-[calc(100vh-220px)] min-h-[520px]">
@@ -89,6 +129,7 @@ export default function CourseDiscussionTab({ course }) {
                 className="pl-8"
               />
             </div>
+
             <Button type="button" variant="outline" onClick={() => refetch()}>
               Refresh
             </Button>
@@ -118,7 +159,10 @@ export default function CourseDiscussionTab({ course }) {
                       <button
                         key={d.id}
                         type="button"
-                        onClick={() => setSelectedId(d.id)}
+                        onClick={() => {
+                          setSelectedId(d.id);
+                          syncUrl(d.id);
+                        }}
                         className={[
                           "w-full text-left p-4 hover:bg-muted/40",
                           active ? "bg-muted/50" : "",
@@ -157,12 +201,13 @@ export default function CourseDiscussionTab({ course }) {
               cooldownSeconds={cooldown}
               onCooldownSet={(sec) => setCooldown(sec)}
               onCreated={(created) => {
-                // refresh list after create
                 refetch();
 
-                // optional: auto-open created post if API returns id
                 const createdId = created?.id ?? created?.data?.id;
-                if (createdId) setSelectedId(createdId);
+                if (createdId) {
+                  setSelectedId(createdId);
+                  syncUrl(createdId);
+                }
               }}
             />
           </div>
@@ -190,7 +235,6 @@ export default function CourseDiscussionTab({ course }) {
                     by {discussion?.user?.name ?? "Student"} • #{selectedId}
                   </div>
 
-                  {/* ✅ Reaction bar: tepat bawah author line, atas body */}
                   <div className="mt-3">
                     <PostReactionBar
                       discussion={discussion}
@@ -200,15 +244,12 @@ export default function CourseDiscussionTab({ course }) {
 
                   <Separator className="my-4" />
 
-                  {/* Render Quill Delta */}
                   <QuillReadOnly value={discussion?.body_json} />
                 </div>
 
-                {/* Comments + add comment box */}
                 <CommentsPanel
                   discussion={discussion}
                   onPosted={() => {
-                    // reload detail so comments update
                     selected.refetch?.();
                   }}
                 />

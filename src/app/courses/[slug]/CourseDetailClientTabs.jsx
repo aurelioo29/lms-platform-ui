@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { SimpleTabs } from "@/components/ui/simple-tabs";
 import { ChevronRight } from "lucide-react";
 
@@ -45,8 +46,23 @@ function ComingSoon({ title }) {
   );
 }
 
+const ALLOWED = new Set(["course", "discussion", "faqs", "progress"]);
+
 export default function CourseDetailClientTabs({ course }) {
-  const [tab, setTab] = useState("course");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const initialFromUrl = searchParams.get("tab");
+  const [tab, setTab] = useState(
+    ALLOWED.has(initialFromUrl) ? initialFromUrl : "course",
+  );
+
+  // If user opens a link with ?tab=discussion, sync state
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t && ALLOWED.has(t) && t !== tab) setTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const tabs = useMemo(
     () => [
@@ -58,14 +74,21 @@ export default function CourseDetailClientTabs({ course }) {
     [],
   );
 
+  function onChange(next) {
+    setTab(next);
+
+    // optional: keep URL in sync (so you can share links)
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("tab", next);
+    router.replace(`?${sp.toString()}`, { scroll: false });
+  }
+
   return (
     <>
-      {/* Tabs bar */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur border-b">
-        <SimpleTabs tabs={tabs} active={tab} onChange={setTab} />
+        <SimpleTabs tabs={tabs} active={tab} onChange={onChange} />
       </div>
 
-      {/* Content */}
       {tab === "course" ? <CourseTab course={course} /> : null}
       {tab === "discussion" ? <CourseDiscussionTab course={course} /> : null}
       {tab === "faqs" ? <ComingSoon title="FAQs tab" /> : null}
