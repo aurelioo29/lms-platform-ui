@@ -3,10 +3,12 @@
 import { useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, MessageSquare, Users, BarChart3 } from "lucide-react";
-
+import { useMe } from "@/features/auth/use-auth";
 import CourseDiscussionTab from "./CourseDiscussionTab";
 import CourseParticipantsTab from "./CourseParticipantsTab";
+import CreateContentDialog from "./CreateContentDialog";
 // import CourseProgressTab from "./CourseProgressTab";
+import CourseContentTab from "./CourseContentTab";
 
 function cx(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -22,6 +24,8 @@ const TABS = [
 export default function CourseDetailClientTabs({ course }) {
   const router = useRouter();
   const sp = useSearchParams();
+  const { data } = useMe();
+  const user = data?.user;
 
   const activeTab = useMemo(() => {
     const t = sp.get("tab");
@@ -78,21 +82,12 @@ export default function CourseDetailClientTabs({ course }) {
 
       {/* Content */}
       <div className="py-6">
-        {activeTab === "course" ? (
-          <div className="rounded-xl border bg-background p-5">
-            <div className="text-sm font-semibold">Course</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Render modules/lessons here. (placeholder)
-            </div>
+        <div className="mb-4 flex items-center justify-end">
+          <CreateContentDialog courseId={course?.id} user={user} />
+        </div>
 
-            <pre className="mt-4 overflow-auto rounded-lg bg-muted p-4 text-xs">
-              {JSON.stringify(
-                { id: course?.id, title: course?.title, slug: course?.slug },
-                null,
-                2,
-              )}
-            </pre>
-          </div>
+        {activeTab === "course" ? (
+          <CourseContentTab course={course} user={user} />
         ) : null}
 
         {activeTab === "discussion" ? (

@@ -25,8 +25,8 @@ export default function QuillReadOnly({ value }) {
   }, [quill, value]);
 
   return (
-    <div className="rounded-md border bg-background">
-      <div ref={quillRef} className="p-3" />
+    <div className="w-full mt-3">
+      <div ref={quillRef} className="w-full" />
     </div>
   );
 }
