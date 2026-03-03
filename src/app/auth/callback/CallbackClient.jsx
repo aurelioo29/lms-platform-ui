@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { authKeys } from "@/features/auth/auth.queries";
-import { setAuthCookie } from "@/lib/api"; // dari api.js yang tadi
+import { setAuthCookie } from "@/lib/api";
 
 export default function CallbackClient() {
   const router = useRouter();
@@ -25,14 +25,17 @@ export default function CallbackClient() {
       return;
     }
 
-    // Simpan token ke cookie
+    // simpan token dulu
     setAuthCookie(token);
 
-    // Refresh data user
-    qc.invalidateQueries({ queryKey: authKeys.me });
-
-    // Gas dashboard
-    router.replace("/dashboard");
+    // lalu refresh auth state, baru lempar dashboard
+    (async () => {
+      try {
+        await qc.invalidateQueries({ queryKey: authKeys.me });
+      } finally {
+        router.replace("/dashboard");
+      }
+    })();
   }, [sp, router, qc]);
 
   return <p style={{ padding: 24 }}>Signing you in with Google...</p>;

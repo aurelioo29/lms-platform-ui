@@ -1,83 +1,127 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-function getCookie(name) {
+// =========================
+// Cookie Helpers
+// =========================
+function readCookie(name) {
   if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-  return match ? match[2] : null;
+
+  const found = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(name + "="));
+
+  if (!found) return null;
+
+  const value = found.split("=").slice(1).join("=");
+  return value || null;
 }
 
-// Optional helpers (recommended)
+function isHttps() {
+  if (typeof window === "undefined") return false;
+  return window.location.protocol === "https:";
+}
+
+// =========================
+// Auth Cookie Helpers
+// =========================
 export function setAuthCookie(token, days = 7) {
   if (typeof document === "undefined") return;
+
+  const secure = isHttps() ? " Secure;" : "";
   const maxAge = days * 24 * 60 * 60;
+
   document.cookie = `auth=${encodeURIComponent(
     token,
-  )}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+  )}; Path=/; Max-Age=${maxAge}; SameSite=Lax;${secure}`;
 }
 
 export function clearAuthCookie() {
   if (typeof document === "undefined") return;
-  document.cookie = "auth=; Path=/; Max-Age=0; SameSite=Lax";
+
+  const secure = isHttps() ? " Secure;" : "";
+  document.cookie = `auth=; Path=/; Max-Age=0; SameSite=Lax;${secure}`;
 }
 
+// =========================
+// Sanctum CSRF Helper
+// =========================
 export async function getCsrfCookie() {
   const res = await fetch(`${API_URL}/sanctum/csrf-cookie`, {
     credentials: "include",
   });
+
   if (!res.ok) throw new Error(`Failed to get CSRF cookie (${res.status})`);
 }
 
-export async function apiFetch(path, options = {}) {
-  const method = (options.method || "GET").toUpperCase();
+// =========================
+// Core Fetch Helpers
+// =========================
+async function parseResponse(res) {
+  const text = await res.text();
 
-  // XSRF token (for Sanctum cookie-based requests)
-  const xsrf = getCookie("XSRF-TOKEN");
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function buildHeaders(optionsHeaders = {}, method = "GET") {
+  const upper = method.toUpperCase();
+
+  const xsrf = readCookie("XSRF-TOKEN");
   const xsrfDecoded = xsrf ? decodeURIComponent(xsrf) : null;
 
-  // Bearer token (for token-based requests e.g. Google OAuth)
-  const auth = getCookie("auth");
+  const auth = readCookie("auth");
   const authDecoded = auth ? decodeURIComponent(auth) : null;
 
   const headers = {
     Accept: "application/json",
-    "Content-Type": "application/json",
-    ...(options.headers || {}),
+    ...(optionsHeaders || {}),
   };
 
-  // Attach Bearer token if available (Google OAuth flow)
+  // Kalau request JSON (bukan upload), set default content-type
+  // (Upload akan override dan tidak set content-type)
+  if (!headers["Content-Type"] && !headers["content-type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  // Bearer token ALWAYS wins kalau ada
   if (authDecoded && !headers.Authorization) {
     headers.Authorization = `Bearer ${authDecoded}`;
   }
 
   const hasBearer = Boolean(authDecoded);
 
-  // Attach XSRF ONLY for cookie/session auth (no bearer)
-  if (!hasBearer && method !== "GET" && method !== "HEAD" && xsrfDecoded) {
+  // XSRF hanya untuk cookie-based sanctum (tanpa bearer)
+  if (!hasBearer && upper !== "GET" && upper !== "HEAD" && xsrfDecoded) {
     headers["X-XSRF-TOKEN"] = xsrfDecoded;
   }
 
+  return { headers, hasBearer };
+}
+
+export async function apiFetch(path, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
+
+  const { headers } = buildHeaders(options.headers, method);
+
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
+    method,
     headers,
-    credentials: "include", // keep cookies for Sanctum
+    credentials: "include",
   });
 
-  // Safe response parsing (json or empty text)
-  let payload = null;
-  const text = await res.text();
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    payload = text || null;
-  }
+  const payload = await parseResponse(res);
 
   if (!res.ok) {
-    const error = new Error(
-      payload?.message || `Request failed (${res.status})`,
-    );
-    error.status = res.status;
-    error.payload = payload;
-    throw error;
+    const err = new Error(payload?.message || `Request failed (${res.status})`);
+    err.status = res.status;
+    err.payload = payload;
+    throw err;
   }
 
   return payload;
@@ -86,53 +130,27 @@ export async function apiFetch(path, options = {}) {
 export async function apiUpload(path, formData, options = {}) {
   const method = (options.method || "POST").toUpperCase();
 
-  const xsrf = getCookie("XSRF-TOKEN");
-  const xsrfDecoded = xsrf ? decodeURIComponent(xsrf) : null;
+  // build headers tapi buang Content-Type (biar browser set boundary)
+  const built = buildHeaders(options.headers, method);
+  const headers = { ...built.headers };
+  delete headers["Content-Type"];
+  delete headers["content-type"];
 
-  const auth = getCookie("auth");
-  const authDecoded = auth ? decodeURIComponent(auth) : null;
-
-  const headers = {
-    Accept: "application/json",
-    ...(options.headers || {}),
-  };
-
-  // Bearer token if exists
-  if (authDecoded && !headers.Authorization) {
-    headers.Authorization = `Bearer ${authDecoded}`;
-  }
-
-  const hasBearer = Boolean(authDecoded);
-
-  // Attach XSRF ONLY for cookie/session auth (no bearer)
-  if (!hasBearer && method !== "GET" && method !== "HEAD" && xsrfDecoded) {
-    headers["X-XSRF-TOKEN"] = xsrfDecoded;
-  }
-
-  // IMPORTANT: jangan set Content-Type, biar browser set boundary multipart
   const res = await fetch(`${API_URL}${path}`, {
+    ...options,
     method,
     headers,
     body: formData,
     credentials: "include",
-    ...options,
   });
 
-  let payload = null;
-  const text = await res.text();
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    payload = text || null;
-  }
+  const payload = await parseResponse(res);
 
   if (!res.ok) {
-    const error = new Error(
-      payload?.message || `Request failed (${res.status})`,
-    );
-    error.status = res.status;
-    error.payload = payload;
-    throw error;
+    const err = new Error(payload?.message || `Request failed (${res.status})`);
+    err.status = res.status;
+    err.payload = payload;
+    throw err;
   }
 
   return payload;
