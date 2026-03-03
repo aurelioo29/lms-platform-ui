@@ -28,10 +28,6 @@ jobs:
             echo "== Go to app dir =="
             cd "$APP_DIR"
 
-            echo "== Ensure correct ownership (optional safety) =="
-            # kalau kamu yakin sudah benar, baris ini boleh dihapus
-            sudo chown -R deploy:deploy "$APP_DIR"
-
             echo "== Pull latest code =="
             git fetch origin main
             git reset --hard origin/main
@@ -43,7 +39,11 @@ jobs:
             npm run build
 
             echo "== Restart PM2 =="
-            pm2 describe lms-ui >/dev/null 2>&1 && pm2 restart lms-ui || pm2 start "npm run start -- -p $APP_PORT" --name lms-ui
+            if pm2 describe lms-ui >/dev/null 2>&1; then
+              pm2 restart lms-ui --update-env
+            else
+              pm2 start npm --name lms-ui -- start -- -p "$APP_PORT"
+            fi
             pm2 save
 
             echo "== Health check local =="
