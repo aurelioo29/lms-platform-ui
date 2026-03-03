@@ -9,7 +9,7 @@ export function fetchMe() {
 }
 
 export async function loginRequest(data) {
-  await getCsrfCookie();
+  // await getCsrfCookie();
   return apiFetch("/api/auth/login", {
     method: "POST",
     body: JSON.stringify(data),

@@ -49,8 +49,10 @@ export async function apiFetch(path, options = {}) {
     headers.Authorization = `Bearer ${authDecoded}`;
   }
 
-  // Attach XSRF header for non-GET requests if cookie exists
-  if (method !== "GET" && method !== "HEAD" && xsrfDecoded) {
+  const hasBearer = Boolean(authDecoded);
+
+  // Attach XSRF ONLY for cookie/session auth (no bearer)
+  if (!hasBearer && method !== "GET" && method !== "HEAD" && xsrfDecoded) {
     headers["X-XSRF-TOKEN"] = xsrfDecoded;
   }
 
@@ -100,8 +102,10 @@ export async function apiUpload(path, formData, options = {}) {
     headers.Authorization = `Bearer ${authDecoded}`;
   }
 
-  // XSRF header for non-GET
-  if (method !== "GET" && method !== "HEAD" && xsrfDecoded) {
+  const hasBearer = Boolean(authDecoded);
+
+  // Attach XSRF ONLY for cookie/session auth (no bearer)
+  if (!hasBearer && method !== "GET" && method !== "HEAD" && xsrfDecoded) {
     headers["X-XSRF-TOKEN"] = xsrfDecoded;
   }
 

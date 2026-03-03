@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { GalleryVerticalEnd, Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
@@ -21,6 +21,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema } from "@/features/auth/login-schema";
 import { useLogin, useResendVerification } from "@/features/auth/use-auth";
 
+import { useQueryClient } from "@tanstack/react-query";
+import { authKeys } from "@/features/auth/auth.queries";
+import { setAuthCookie } from "@/lib/api";
+
 import {
   alertError,
   alertSuccess,
@@ -30,6 +34,9 @@ import {
 
 export function LoginForm({ className, ...props }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const qc = useQueryClient();
+
   const loginMutation = useLogin();
   const resendMutation = useResendVerification();
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -53,8 +60,23 @@ export function LoginForm({ className, ...props }) {
 
   async function onSubmit(values) {
     try {
-      await loginMutation.mutateAsync(values);
-      router.push("/dashboard");
+      // ✅ ambil response login (berisi token)
+      const res = await loginMutation.mutateAsync(values);
+
+      // ✅ simpan token jadi cookie "auth" (ini yang sebelumnya hilang)
+      if (res?.token) {
+        setAuthCookie(res.token);
+      } else {
+        // kalau token gak ada, lebih baik fail fast biar ketahuan
+        throw new Error("Token tidak ditemukan dari response login.");
+      }
+
+      // ✅ refetch /me supaya AuthGate dan Dashboard langsung kebaca usernya
+      await qc.invalidateQueries({ queryKey: authKeys.me });
+
+      // ✅ redirect ke halaman tujuan (kalau ada ?next=...)
+      const next = searchParams?.get("next");
+      router.push(next ? decodeURIComponent(next) : "/dashboard");
     } catch (e) {
       // ✅ email belum verifikasi (409)
       if (e?.status === 409 && e?.payload?.code === "EMAIL_NOT_VERIFIED") {
@@ -93,7 +115,6 @@ export function LoginForm({ className, ...props }) {
         setFieldError: (field, message) =>
           setError(field, { type: "server", message }),
         fallbackMessage: "Terjadi error. Coba lagi.",
-        // kalau kamu mau pesan server mentah tampil, set false
         hideServerDetails: true,
       });
     }
