@@ -6,6 +6,11 @@ const nextConfig = {
       { protocol: "https", hostname: "googleusercontent.com" },
     ],
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "100mb",
+    },
+  },
 };
 
 export default nextConfig;

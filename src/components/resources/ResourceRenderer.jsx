@@ -7,42 +7,37 @@ import ImagePreview from "./ImagePreview";
 import FileAttachment from "./FileAttachment";
 
 export default function ResourceRenderer({ type, resource }) {
-  // resource: object dari API (misal lesson asset)
-  // Minimal fields:
-  // - url (string)
-  // - title (string optional)
-  // - mime (string optional)
-  // - poster (string optional)
+  if (!type || !resource) return null;
 
-  if (!type) return null;
+  // normalize: backend kamu pakai resource_url, frontend lama pakai url
+  const url = resource.url || resource.resource_url || "";
+  const title = resource.title || resource.resource_title || "Resource";
+  const mime = resource.mime || resource.resource_mime;
+  const poster = resource.poster || resource.resource_poster;
+
+  if (!url) {
+    return (
+      <div className="text-sm text-muted-foreground">
+        No resource URL. (type: <b>{type}</b>)
+      </div>
+    );
+  }
 
   switch (type) {
     case "pdf":
-      return <PdfPreview url={resource.url} title={resource.title} />;
+      return <PdfPreview url={url} title={title} />;
 
     case "video_embed":
-      return <VideoEmbed url={resource.url} title={resource.title} />;
+      return <VideoEmbed url={url} title={title} />;
 
     case "video_upload":
-      return (
-        <VideoUpload
-          url={resource.url}
-          title={resource.title}
-          poster={resource.poster}
-        />
-      );
+      return <VideoUpload url={url} title={title} poster={poster} />;
 
     case "image":
-      return <ImagePreview url={resource.url} title={resource.title} />;
+      return <ImagePreview url={url} title={title} />;
 
     case "file":
-      return (
-        <FileAttachment
-          url={resource.url}
-          title={resource.title}
-          mime={resource.mime}
-        />
-      );
+      return <FileAttachment url={url} title={title} mime={mime} />;
 
     default:
       return (

@@ -1,7 +1,5 @@
 "use client";
 
-import VideoPlayer from "@/components/VideoPlayer"; // adjust path if needed
-
 export default function VideoUpload({ url, title = "Video", poster }) {
   if (!url)
     return <div className="text-sm text-muted-foreground">No video URL.</div>;
@@ -13,7 +11,13 @@ export default function VideoUpload({ url, title = "Video", poster }) {
       </div>
 
       <div className="p-4">
-        <VideoPlayer src={url} poster={poster} />
+        <video
+          src={url}
+          poster={poster}
+          controls
+          preload="metadata"
+          className="w-full rounded-lg"
+        />
       </div>
     </div>
   );
