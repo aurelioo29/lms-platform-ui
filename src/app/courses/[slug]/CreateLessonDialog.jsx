@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +11,8 @@ import {
   useCreateLesson,
   useCreateLessonAsset,
 } from "@/features/course-modules/module-queries";
+
+import { useCreateQuiz } from "@/features/quizzes/quiz-queries";
 
 import {
   Dialog,
@@ -37,14 +40,16 @@ const schema = z
     module_id: z.coerce.number().min(1, "Select a module"),
     title: z.string().min(3, "Title min 3 chars"),
     sort_order: z.coerce.number().min(1).optional(),
+
     content_type: z
-      .enum(["lesson", "assignment", "resource"])
+      .enum(["lesson", "resource", "assignment"])
       .default("lesson"),
     lock_mode: z.enum(["open", "complete"]).default("open"),
 
     resource_type: z
       .enum(["pdf", "video_embed", "video_upload", "image", "file"])
       .optional(),
+
     resource_url: z.string().url("Invalid URL").optional().or(z.literal("")),
   })
   .superRefine((val, ctx) => {
@@ -76,8 +81,11 @@ export default function CreateLessonDialog({
   courseId,
   moduleId,
 }) {
-  const create = useCreateLesson(courseId);
+  const router = useRouter();
+
+  const createLesson = useCreateLesson(courseId);
   const createAsset = useCreateLessonAsset(courseId);
+  const createQuiz = useCreateQuiz(courseId);
 
   const [body, setBody] = useState(null);
   const [resourceFile, setResourceFile] = useState(null);
@@ -103,7 +111,8 @@ export default function CreateLessonDialog({
   const isResource = contentType === "resource";
   const isAssignment = contentType === "assignment";
 
-  const isBusy = create.isPending || createAsset.isPending;
+  const isBusy =
+    createLesson.isPending || createAsset.isPending || createQuiz.isPending;
 
   useEffect(() => {
     if (!open) return;
@@ -120,18 +129,45 @@ export default function CreateLessonDialog({
 
     setBody(null);
     setResourceFile(null);
-  }, [open, moduleId]); // intentionally depends on moduleId
+  }, [open, moduleId]); // yes, keep moduleId
 
   const canSubmit = useMemo(() => {
     if (!moduleId) return false;
     if (isBusy) return false;
-    if (isAssignment) return false; // coming soon
     return true;
-  }, [moduleId, isBusy, isAssignment]);
+  }, [moduleId, isBusy]);
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      const createdLesson = await create.mutateAsync({
+      // ✅ Assignment = Quiz flow
+      if (values.content_type === "assignment") {
+        // 1) create quiz
+        const createdQuiz = await createQuiz.mutateAsync({
+          title: values.title,
+          type: "mcq",
+          // optionally:
+          // time_limit_seconds: null,
+          // attempt_limit: null,
+          // published_at: null,
+        });
+
+        // 2) create a lesson placeholder so it appears in module list
+        await createLesson.mutateAsync({
+          module_id: values.module_id,
+          title: values.title,
+          sort_order: values.sort_order,
+          content_type: "assignment",
+          lock_mode: values.lock_mode,
+          content_json: { kind: "quiz", quiz_id: createdQuiz.id },
+        });
+
+        onOpenChange(false);
+        router.push(`/dashboard/admin/quizzes/${createdQuiz.id}`);
+        return;
+      }
+
+      // ✅ Lesson / Resource flow
+      const createdLesson = await createLesson.mutateAsync({
         module_id: values.module_id,
         title: values.title,
         sort_order: values.sort_order,
@@ -140,6 +176,7 @@ export default function CreateLessonDialog({
         content_json: isLesson ? body : null,
       });
 
+      // ✅ Resource asset
       if (isResource) {
         const fd = new FormData();
         fd.append("lesson_id", String(createdLesson.id));
@@ -182,7 +219,7 @@ export default function CreateLessonDialog({
                 • <b>Resource</b> = upload / embed
               </div>
               <div>
-                • <b>Assignment</b> = coming soon
+                • <b>Assignment</b> = Quiz (create then manage questions)
               </div>
             </div>
           </DialogDescription>
@@ -191,7 +228,10 @@ export default function CreateLessonDialog({
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Title</Label>
-            <Input {...form.register("title")} placeholder="e.g. What is AI?" />
+            <Input
+              {...form.register("title")}
+              placeholder="e.g. Quiz: Intro AI"
+            />
             {form.formState.errors.title ? (
               <p className="text-xs text-red-600">
                 {form.formState.errors.title.message}
@@ -218,7 +258,9 @@ export default function CreateLessonDialog({
                     <SelectContent>
                       <SelectItem value="lesson">Lesson</SelectItem>
                       <SelectItem value="resource">Resource</SelectItem>
-                      <SelectItem value="assignment">Assignment</SelectItem>
+                      <SelectItem value="assignment">
+                        Assignment (Quiz)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -308,10 +350,6 @@ export default function CreateLessonDialog({
                       setResourceFile(e.target.files?.[0] || null)
                     }
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Stored in <code>lesson_assets</code>. Video preview nanti
-                    pakai <b>Video.js</b> di lesson page.
-                  </p>
                 </div>
               )}
             </div>
@@ -319,16 +357,17 @@ export default function CreateLessonDialog({
 
           {isAssignment ? (
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-              <div className="font-medium">Assignment feature coming soon.</div>
+              <div className="font-medium">Quiz will be created</div>
               <div className="text-muted-foreground">
-                It’s not broken. It’s “roadmap”.
+                You’ll be redirected to manage questions. Because quizzes have
+                lots of questions. Nature is healing.
               </div>
             </div>
           ) : null}
 
           <DialogFooter>
             <Button type="submit" disabled={!canSubmit}>
-              {isBusy ? "Creating..." : isAssignment ? "Coming soon" : "Create"}
+              {isBusy ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>
         </form>

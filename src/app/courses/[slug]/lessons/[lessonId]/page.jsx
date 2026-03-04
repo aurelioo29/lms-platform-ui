@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
 import { useCourseBySlug } from "@/features/courses/courses-queries";
 import { useLessonDetailPublic } from "@/features/course-modules/module-queries";
+
+import QuizPlayer from "@/components/quizzes/QuizPlayer";
 
 import {
   Breadcrumb,
@@ -156,10 +157,11 @@ export default function LessonDetailPage() {
                   mime: lesson.resource_mime,
                 }}
               />
+            ) : lesson.content_type === "assignment" ? (
+              <QuizPlayer lessonId={lessonIdNum} />
             ) : (
               <div className="text-sm text-muted-foreground">
-                This content type is <b>{lesson.content_type}</b>. Rendering UI
-                will be handled next.
+                This content type is <b>{lesson.content_type}</b>.
               </div>
             )}
           </CardContent>
