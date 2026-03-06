@@ -61,7 +61,7 @@ export default function QuizPlayer({ lessonId }) {
     const payload = {
       answers: questions.map((q) => {
         const v = answers[q.id];
-        if (q.question_type === "mcq_multi") {
+        if (q.question_type === "mcq_multi") {  
           return { question_id: q.id, option_ids: Array.isArray(v) ? v : [] };
         }
         if (q.question_type === "essay") {

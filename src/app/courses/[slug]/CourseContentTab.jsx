@@ -3,10 +3,11 @@
 import { useMemo, useState } from "react";
 import {
   ChevronDown,
-  Plus,
   BookOpen,
   Paperclip,
   ClipboardList,
+  Pencil,
+  Plus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -18,14 +19,16 @@ import {
   usePublicModules,
   useAdminModules,
 } from "@/features/course-modules/module-queries";
-import CreateModuleDialog from "./CreateModuleDialog";
+
+import CreateModuleDialog from "./modules/CreateModuleDialog";
 import CreateLessonDialog from "./CreateLessonDialog";
+import EditModuleDialog from "./modules/EditModuleDialog";
+import DeleteModuleButton from "./modules/DeleteModuleButton";
 
 function cx(...c) {
   return c.filter(Boolean).join(" ");
 }
 
-// ✅ map content_type -> lucide icon
 const CONTENT_TYPE_ICON = {
   lesson: BookOpen,
   resource: Paperclip,
@@ -44,11 +47,18 @@ export default function CourseContentTab({ course, user }) {
     : usePublicModules(courseId);
 
   const [openModule, setOpenModule] = useState(null);
+
   const [lessonModal, setLessonModal] = useState({
     open: false,
     moduleId: null,
   });
+
   const [openCreateModule, setOpenCreateModule] = useState(false);
+
+  const [editModuleModal, setEditModuleModal] = useState({
+    open: false,
+    module: null,
+  });
 
   const sorted = useMemo(() => {
     return [...modules].sort(
@@ -57,18 +67,18 @@ export default function CourseContentTab({ course, user }) {
   }, [modules]);
 
   if (!courseId) return null;
-  if (isLoading)
+
+  if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading content...</p>;
+  }
 
   return (
     <div className="space-y-4">
       {canCreate ? (
-        <div className="flex items-center justify-end gap-2">
-          <CreateModuleDialog
-            open={openCreateModule}
-            onOpenChange={setOpenCreateModule}
-            courseId={courseId}
-          />
+        <div className="flex items-center justify-end">
+          <Button type="button" onClick={() => setOpenCreateModule(true)}>
+            + Create Module
+          </Button>
         </div>
       ) : null}
 
@@ -91,27 +101,53 @@ export default function CourseContentTab({ course, user }) {
           return (
             <Card key={m.id}>
               <CardContent className="p-5">
-                {/* Module header */}
-                <button
-                  type="button"
-                  onClick={() => setOpenModule(isOpen ? null : m.id)}
-                  className="flex w-full items-center justify-between gap-3 text-left"
-                >
-                  <div className="min-w-0">
-                    <div className="text-[22px] font-semibold tracking-tight">
-                      {m.title}
+                <div className="flex items-start justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setOpenModule(isOpen ? null : m.id)}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[22px] font-semibold tracking-tight">
+                        {m.title}
+                      </div>
                     </div>
-                  </div>
 
-                  <ChevronDown
-                    className={cx(
-                      "h-5 w-5 shrink-0 transition-transform",
-                      isOpen ? "rotate-180" : "rotate-0",
-                    )}
-                  />
-                </button>
+                    <ChevronDown
+                      className={cx(
+                        "h-5 w-5 shrink-0 transition-transform",
+                        isOpen ? "rotate-180" : "rotate-0",
+                      )}
+                    />
+                  </button>
 
-                {/* Lessons list */}
+                  {canCreate ? (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditModuleModal({
+                            open: true,
+                            module: m,
+                          })
+                        }
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-muted"
+                        aria-label={`Edit module ${m.title}`}
+                        title="Edit module"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+
+                      <DeleteModuleButton
+                        courseId={courseId}
+                        moduleId={m.id}
+                        moduleTitle={m.title}
+                        iconOnly
+                      />
+                    </div>
+                  ) : null}
+                </div>
+
                 {isOpen ? (
                   <>
                     <Separator className="my-4" />
@@ -141,12 +177,10 @@ export default function CourseContentTab({ course, user }) {
                               )}
                             >
                               <div className="flex min-w-0 items-center gap-2">
-                                {/* ✅ left icon */}
                                 <span className="flex h-7 w-7 items-center justify-center rounded-md border bg-background">
                                   <Icon className="h-4 w-4 text-muted-foreground" />
                                 </span>
 
-                                {/* ✅ title */}
                                 <span className="min-w-0 truncate text-sm text-blue-600 hover:underline">
                                   {l.title}
                                 </span>
@@ -164,6 +198,7 @@ export default function CourseContentTab({ course, user }) {
                     {canCreate ? (
                       <div className="mt-4">
                         <Button
+                          type="button"
                           variant="outline"
                           className="gap-2"
                           onClick={() =>
@@ -182,6 +217,25 @@ export default function CourseContentTab({ course, user }) {
           );
         })
       )}
+
+      <CreateModuleDialog
+        open={openCreateModule}
+        onOpenChange={setOpenCreateModule}
+        courseId={courseId}
+      />
+
+      <EditModuleDialog
+        open={editModuleModal.open}
+        onOpenChange={(open) =>
+          setEditModuleModal((s) => ({
+            ...s,
+            open,
+            module: open ? s.module : null,
+          }))
+        }
+        courseId={courseId}
+        module={editModuleModal.module}
+      />
 
       <CreateLessonDialog
         open={lessonModal.open}

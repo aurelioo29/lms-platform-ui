@@ -65,7 +65,9 @@ export default function CreateModuleDialog({ courseId, open, onOpenChange }) {
         confirmText: "OK",
       });
     } catch (err) {
-      await handleApiError(err, { fallbackMessage: "Gagal membuat module." });
+      await handleApiError(err, {
+        fallbackMessage: "Gagal membuat module.",
+      });
     }
   }
 
@@ -99,7 +101,7 @@ export default function CreateModuleDialog({ courseId, open, onOpenChange }) {
                 Urutan (Opsional)
               </div>
               <div className="text-[11px] text-muted-foreground">
-                Angka kecil tampil duluan
+                Urutan module pada course content.
               </div>
             </div>
 
@@ -115,20 +117,27 @@ export default function CreateModuleDialog({ courseId, open, onOpenChange }) {
             />
 
             <div className="text-[11px] text-muted-foreground">
-              Kosongkan kalau nggak peduli urutan.
+              Kosongkan kalau tidak peduli dengan urutan.
             </div>
           </div>
         </div>
 
         <DialogFooter>
           <Button
+            type="button"
             variant="outline"
             onClick={() => onOpenChange?.(false)}
             disabled={loading}
+            className="cursor-pointer"
           >
             Cancel
           </Button>
-          <Button onClick={submit} disabled={!canSubmit}>
+          <Button
+            type="button"
+            onClick={submit}
+            disabled={!canSubmit}
+            className="cursor-pointer"
+          >
             {loading ? "Creating..." : "Create"}
           </Button>
         </DialogFooter>

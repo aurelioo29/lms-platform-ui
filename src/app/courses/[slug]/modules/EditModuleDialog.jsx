@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-import { useCreateModule } from "@/features/course-modules/module-queries";
+import { useUpdateModule } from "@/features/course-modules/module-queries";
 import { alertSuccess, handleApiError } from "@/lib/ui/alerts";
 
 function toIntOrNull(v) {
@@ -21,56 +21,65 @@ function toIntOrNull(v) {
   return Math.trunc(n);
 }
 
-export default function CreateModuleDialog({ courseId }) {
-  const [open, setOpen] = useState(false);
+export default function EditModuleDialog({
+  courseId,
+  module,
+  open,
+  onOpenChange,
+}) {
   const [title, setTitle] = useState("");
   const [order, setOrder] = useState("");
 
-  const createModule = useCreateModule(courseId);
+  const updateMutation = useUpdateModule(courseId);
 
   useEffect(() => {
+    if (open && module) {
+      setTitle(module.title ?? "");
+      setOrder(module.sort_order ? String(module.sort_order) : "");
+    }
+
     if (!open) {
       setTitle("");
       setOrder("");
     }
-  }, [open]);
+  }, [open, module]);
 
   const canSubmit = useMemo(() => {
     const t = title.trim();
     const o = toIntOrNull(order);
     const orderOk = o === null || o >= 1;
-    return t.length >= 3 && orderOk && !createModule.isPending;
-  }, [title, order, createModule.isPending]);
+    return t.length >= 3 && orderOk && !updateMutation.isPending;
+  }, [title, order, updateMutation.isPending]);
 
   async function submit() {
     try {
       const sort_order = toIntOrNull(order);
 
-      await createModule.mutateAsync({
+      await updateMutation.mutateAsync({
+        moduleId: module.id,
         title: title.trim(),
         ...(sort_order !== null ? { sort_order } : {}),
       });
 
-      // ✅ Tutup dialog dulu biar ga tabrakan sama swal
-      setOpen(false);
+      onOpenChange?.(false);
 
       await alertSuccess({
         title: "Berhasil",
-        message: "Module berhasil dibuat. Sekarang isi lesson-nya",
+        message: "Module berhasil diupdate.",
         confirmText: "OK",
       });
-    } catch (e) {
-      await handleApiError(e, { fallbackMessage: "Gagal membuat module." });
+    } catch (err) {
+      await handleApiError(err, {
+        fallbackMessage: "Gagal mengupdate module.",
+      });
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button onClick={() => setOpen(true)}>+ Create Module</Button>
-
+    <Dialog open={!!open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create Module</DialogTitle>
+          <DialogTitle>Edit Module</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -79,30 +88,28 @@ export default function CreateModuleDialog({ courseId }) {
               Judul Module
             </div>
             <Input
-              placeholder="contoh: Topik 1. Pengantar"
+              placeholder="Contoh: Topik 1. Pengantar"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && canSubmit) submit();
+              }}
             />
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-medium text-muted-foreground">
-                Urutan (opsional)
-              </div>
-              <div className="text-[11px] text-muted-foreground">
-                angka kecil tampil duluan
-              </div>
+            <div className="text-xs font-medium text-muted-foreground">
+              Urutan (Opsional)
             </div>
-
             <Input
               type="number"
               min={1}
-              placeholder="contoh: 1"
+              placeholder="Contoh: 1"
               value={order}
               onChange={(e) => setOrder(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && canSubmit) submit();
+              }}
             />
           </div>
         </div>
@@ -110,13 +117,13 @@ export default function CreateModuleDialog({ courseId }) {
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => setOpen(false)}
-            disabled={createModule.isPending}
+            onClick={() => onOpenChange?.(false)}
+            disabled={updateMutation.isPending}
           >
-            Batal
+            Cancel
           </Button>
           <Button onClick={submit} disabled={!canSubmit}>
-            {createModule.isPending ? "Membuat..." : "Buat"}
+            {updateMutation.isPending ? "Saving..." : "Save Changes"}
           </Button>
         </DialogFooter>
       </DialogContent>
