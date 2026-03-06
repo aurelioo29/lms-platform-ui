@@ -182,8 +182,10 @@ export function CoursesTable({
                         {r.title || "-"}
                       </Link>
                       {r.description ? (
-                        <div className="mt-1 text-[11px] text-muted-foreground line-clamp-1">
-                          {r.description}
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {r.description?.length > 90
+                            ? `${r.description.slice(0, 90)}...`
+                            : r.description}
                         </div>
                       ) : (
                         <div className="mt-1 text-[11px] text-muted-foreground">
